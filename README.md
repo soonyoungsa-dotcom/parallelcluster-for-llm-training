@@ -6,82 +6,117 @@ AWS ParallelCluster를 사용한 분산 학습 환경 구축 솔루션입니다.
 
 ## 🏗️ Architecture Overview
 
-### 주요 구성 요소
+### 주요 구성 요소 (AMP + AMG 권장 구성)
 
 ```
-                    ┌──────────────────────┐
-                    │  Application Load    │
-                    │     Balancer         │
-                    │  (Optional HTTPS)    │
-                    └──────────┬───────────┘
-                               │
-                               │ Port 443/80
-                               │
-┌──────────────────────────────┼──────────────────────────────┐
-│                              │                              │
-│  ┌───────────────────────────▼──────┐                      │
-│  │   Monitoring Instance             │                      │
-│  │   (t3.medium - Standalone)        │                      │
-│  ├───────────────────────────────────┤                      │
-│  │ • Prometheus                      │                      │
-│  │ • Grafana :3000                   │                      │
-│  │ • Persistent Storage              │                      │
-│  └───────────────────────────────────┘                      │
-│                                                               │
-│  ┌───────────────────────────────────┐                      │
-│  │      LoginNode Pool               │                      │
-│  │      (m5.large x2)                │                      │
-│  ├───────────────────────────────────┤                      │
-│  │ • User Access (SSH)               │                      │
-│  │ • Job Submission                  │                      │
-│  │ • Data Preprocessing              │                      │
-│  └───────────────┬───────────────────┘                      │
-│                  │                                           │
-│       ┌──────────▼──────────┐    ┌─────────────────────────┐│
-│       │   HeadNode          │    │   ComputeNodes          ││
-│       │   (m5.8xlarge)      │    │   (p6-b200.48xlarge)    ││
-│       ├─────────────────────┤    ├─────────────────────────┤│
-│       │ • Slurm Master      │    │ • 8x B200 GPUs (192GB)  ││
-│       │ • Job Scheduler     │    │ • 192 vCPUs, 2TB RAM    ││
-│       │ • NFS Server        │    │ • 3.2Tbps Network       ││
-│       └──────────┬──────────┘    └──────────┬──────────────┘│
-│                  │                           │               │
-│                  └───────────┬───────────────┘               │
-│                              │                               │
-│                 ┌────────────▼────────────┐                  │
-│                 │   Shared Storage        │                  │
-│                 │   (FSx Lustre)          │                  │
-│                 │   • High-performance    │                  │
-│                 │   • Multi-GB/s          │                  │
-│                 └─────────────────────────┘                  │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        AWS Managed Services                         │
+│                                                                       │
+│  ┌──────────────────────────┐    ┌──────────────────────────────┐  │
+│  │  Amazon Managed Grafana  │    │ Amazon Managed Prometheus    │  │
+│  │         (AMG)            │◄───│         (AMP)                │  │
+│  ├──────────────────────────┤    ├──────────────────────────────┤  │
+│  │ • AWS SSO 인증           │    │ • 메트릭 저장소              │  │
+│  │ • 대시보드 시각화        │    │ • 자동 스케일링              │  │
+│  │ • 알림 설정              │    │ • 고가용성                   │  │
+│  └──────────────────────────┘    └──────────────▲───────────────┘  │
+│                                                   │                  │
+└───────────────────────────────────────────────────┼──────────────────┘
+                                                    │
+                                                    │ Remote Write
+                                                    │ (IAM Auth)
+                                                    │
+┌───────────────────────────────────────────────────┼──────────────────┐
+│                    ParallelCluster VPC            │                  │
+│                                                    │                  │
+│  ┌────────────────────────────────────────────────┼────────────────┐ │
+│  │              Public Subnet (10.0.0.0/24)       │                │ │
+│  │                                                 │                │ │
+│  │  ┌──────────────────────────────────────────┐  │                │ │
+│  │  │      LoginNode Pool (m5.large x2)        │  │                │ │
+│  │  ├──────────────────────────────────────────┤  │                │ │
+│  │  │ • SSH 접근 (특정 IP만)                  │  │                │ │
+│  │  │ • Job 제출                               │  │                │ │
+│  │  │ • 데이터 전처리                          │  │                │ │
+│  │  │ • Node Exporter :9100                    │──┘                │ │
+│  │  └──────────────────────────────────────────┘                   │ │
+│  │                                                                  │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐ │
+│  │             Private Subnet (10.0.16.0/20)                        │ │
+│  │                                                                  │ │
+│  │  ┌────────────────────────┐      ┌──────────────────────────┐  │ │
+│  │  │   HeadNode             │      │   ComputeNodes           │  │ │
+│  │  │   (m5.8xlarge)         │      │   (p6-b200.48xlarge)     │  │ │
+│  │  ├────────────────────────┤      ├──────────────────────────┤  │ │
+│  │  │ • Slurm Controller     │      │ • 8x B200 GPUs (192GB)   │  │ │
+│  │  │ • NFS Server (/home)   │      │ • 192 vCPUs, 2TB RAM     │  │ │
+│  │  │ • Node Exporter :9100  │──┐   │ • 3.2Tbps Network (EFA)  │  │ │
+│  │  └────────────┬───────────┘  │   │ • DCGM Exporter :9400    │──┤ │
+│  │               │              │   │ • Node Exporter :9100    │  │ │
+│  │               │              │   │ • EFA Monitor            │  │ │
+│  │               │              │   └──────────┬───────────────┘  │ │
+│  │               │              │              │                  │ │
+│  │               │              └──────────────┼──────────────────┘ │
+│  │               │                             │                    │
+│  │               │    ┌────────────────────────┘                    │
+│  │               │    │                                             │
+│  │               ▼    ▼                                             │
+│  │  ┌────────────────────────────────────────┐                     │ │
+│  │  │      Shared Storage (FSx Lustre)       │                     │ │
+│  │  ├────────────────────────────────────────┤                     │ │
+│  │  │ • /fsx (고성능 공유 스토리지)          │                     │ │
+│  │  │ • 데이터셋, 모델, 체크포인트           │                     │ │
+│  │  │ • Multi-GB/s 처리량                    │                     │ │
+│  │  └────────────────────────────────────────┘                     │ │
+│  │                                                                  │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
                         VPC (10.0.0.0/16)
+
+메트릭 흐름:
+  1. 각 노드의 Exporter가 메트릭 수집 (DCGM, Node, EFA)
+  2. Prometheus Agent가 메트릭을 AMP로 Remote Write
+  3. AMG가 AMP에서 메트릭 조회 및 시각화
+  4. 사용자는 AWS SSO로 AMG 접근
 ```
 
 ### 노드 역할
 
-- **Monitoring Instance (독립형)**: 
-  - 클러스터와 별도로 운영되는 모니터링 전용 서버
-  - 클러스터 삭제 시에도 모니터링 데이터 유지
-  - ALB를 통한 안전한 웹 접근 (직접 Public IP 노출 방지)
-  
 - **LoginNode Pool**: 
-  - 사용자 접근 및 작업 제출 전용
+  - 사용자 SSH 접근 및 작업 제출 전용
   - 데이터 전처리 및 간단한 작업 수행
   - HeadNode의 컴퓨팅 리소스 보호
+  - Public Subnet (특정 IP만 SSH 허용)
   
 - **HeadNode**: 
   - Slurm 스케줄러 및 작업 관리
+  - NFS 서버 역할 (/home 공유)
   - Private Subnet에 위치 (보안)
-  - NFS 서버 역할
   
 - **ComputeNodes**: 
-  - GPU 워크로드 실행 전용 (인스턴스 타입별 설정: [가이드](guide/INSTANCE-TYPE-CONFIGURATION.md))
+  - GPU 워크로드 실행 전용
   - Private Subnet에 위치
-  - Auto-scaling 지원
+  - Auto-scaling 지원 (Slurm 연동)
+  - EFA 네트워크로 노드 간 고속 통신
+
+### 모니터링 아키텍처
+
+**AWS Managed Services (권장)**:
+- **Amazon Managed Prometheus (AMP)**: 메트릭 저장 및 쿼리
+- **Amazon Managed Grafana (AMG)**: 대시보드 및 시각화
+- **장점**: 관리 부담 없음, 고가용성, 자동 스케일링, AWS SSO 통합
+
+**Self-hosting (대안)**:
+- Standalone Monitoring Instance (t3.medium)
+- Prometheus + Grafana 직접 운영
+- ALB를 통한 HTTPS 접근
+- 클러스터와 독립적으로 운영
 
 📖 **상세 아키텍처 설명**: [guide/ARCHITECTURE.md](guide/ARCHITECTURE.md)
+📖 **AMP+AMG 설정 가이드**: [guide/AMP-AMG-SETUP.md](guide/AMP-AMG-SETUP.md)
 
 ## 📁 Directory Structure
 
@@ -146,6 +181,8 @@ aws configure
 ```
 
 ## 🚀 Quick Start
+
+📖 **빠른 시작 가이드**: [guide/QUICKSTART-EFA-MONITORING.md](guide/QUICKSTART-EFA-MONITORING.md)
 
 ### 1. 인프라 배포
 
@@ -656,6 +693,14 @@ pcluster get-cluster-log-events --cluster-name my-cluster
 # 설정 검증
 pcluster validate-cluster-configuration --cluster-configuration cluster-config.yaml
 ```
+
+## 📝 Additional Guides
+
+- [빠른 시작 가이드](guide/QUICKSTART-EFA-MONITORING.md) - EFA 모니터링 포함 빠른 설정
+- [클러스터 재생성 가이드](guide/CLUSTER-RECREATION-GUIDE.md) - 클러스터 삭제 및 재생성 절차
+- [CloudWatch 모니터링 완료](guide/CLOUDWATCH-MONITORING-COMPLETE.md) - CloudWatch 통합 설정
+- [선택적 컴포넌트 업데이트](guide/OPTIONAL-COMPONENTS-UPDATE.md) - 추가 기능 설치
+- [변경 이력](guide/CHANGELOG-EFA-MONITORING.md) - EFA 모니터링 업데이트 내역
 
 ## 📚 Additional Resources
 
