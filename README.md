@@ -2,7 +2,7 @@
 
 ![Architecture Diagram](img/architecture.png)
 
-AWS ParallelCluster를 사용한 분산 학습 환경 구축을 위한 에셋입니다. GPU 인스턴스 (p5en.48xlarge, p6-b200.48xlarge 등) 및 GPU 인스턴스를 컴퓨트 노드로 활용할 수 있으며, 모니터링 스택과 자동화된 설정을 포함합니다.
+AWS ParallelCluster를 사용한 분산 학습 환경 구축을 위한 에셋입니다. GPU 및 CPU 인스턴스를 컴퓨트 노드로 활용할 수 있으며, 모니터링 스택과 자동화된 설정을 포함합니다.
 
 ## 🏗️ Architecture Overview
 
