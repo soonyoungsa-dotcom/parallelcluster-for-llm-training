@@ -203,6 +203,8 @@ aws cloudformation wait stack-create-complete \
 
 ### 2. S3 버킷 및 config 업로드
 
+ParallelCluster 배포 시 S3 Bucket 등록은 필수가 아닙니다. 다만 본 에셋에서는 자동화 스크립트를 배포 시 참조하므로 S3에 스크립트 업로드가 필요합니다.
+
 ```bash
 # S3 버킷 생성
 aws s3 mb s3://my-pcluster-scripts --region us-east-2
