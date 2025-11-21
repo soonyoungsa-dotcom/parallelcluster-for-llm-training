@@ -121,8 +121,6 @@ AWS ParallelCluster를 사용한 분산 학습 환경 구축 솔루션입니다.
 - ALB를 통한 HTTPS 접근
 - 클러스터와 독립적으로 운영
 
-📖 **AMP+AMG 설정 가이드**: [guide/AMP-AMG-SETUP.md](guide/AMP-AMG-SETUP.md)
-
 ## 📁 Directory Structure
 
 ```
@@ -339,39 +337,6 @@ source environment-variables.sh
 envsubst < cluster-config.yaml.template > cluster-config.yaml
 ```
 
-**⚠️ AWS Managed Prometheus 사용 시 추가 설정 필요**
-
-`MonitoringType=amp-only` 또는 `amp+amg`를 선택한 경우, 모든 노드에 AMP remote_write IAM Policy를 추가해야 합니다:
-
-```bash
-# AMP Remote Write Policy ARN 확인
-AMP_POLICY_ARN=$(aws cloudformation describe-stacks \
-  --stack-name parallelcluster-infra \
-  --region $REGION \
-  --query 'Stacks[0].Outputs[?OutputKey==`AMPRemoteWritePolicyArn`].OutputValue' \
-  --output text)
-
-echo "AMP Policy ARN: $AMP_POLICY_ARN"
-
-# cluster-config.yaml에 수동으로 추가
-# HeadNode, LoginNodes, ComputeNodes의 Iam.AdditionalIamPolicies에 추가:
-#   - Policy: arn:aws:iam::123456789012:policy/parallelcluster-infra-amp-remote-write
-```
-
-또는 environment-variables.sh에 추가하여 자동화:
-
-```bash
-# environment-variables.sh에 추가
-export AMP_POLICY_ARN="arn:aws:iam::123456789012:policy/parallelcluster-infra-amp-remote-write"
-
-# cluster-config.yaml.template에서 사용
-# Iam:
-#   AdditionalIamPolicies:
-#     - Policy: ${AMP_POLICY_ARN}
-```
-
-📖 **상세 설정 가이드**: [guide/QUICKSTART-EFA-MONITORING.md](guide/QUICKSTART-EFA-MONITORING.md)
-
 ### 4. 클러스터 생성
 
 ```bash
@@ -530,8 +495,6 @@ aws cloudformation describe-stacks \
 # 접속: https://<ALB-DNS>/grafana/
 # 기본 로그인: admin / Grafana4PC!
 ```
-
-📖 **모니터링 설정 가이드**: [guide/AMP-AMG-SETUP.md](guide/AMP-AMG-SETUP.md)
 
 ### 7. NCCL 성능 테스트
 
