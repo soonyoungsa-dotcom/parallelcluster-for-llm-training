@@ -2,11 +2,17 @@
 
 ![Architecture Diagram](img/architecture.png)
 
-AWS ParallelCluster를 사용한 분산 학습 환경 구축 솔루션입니다. XPU 인스턴스 (예: p6-b200.48xlarge with B200 GPUs)에 최적화되어 있으며, 모니터링 스택과 성능 테스트를 포함합니다.
+AWS ParallelCluster를 사용한 분산 학습 환경 구축 솔루션입니다. GPU 인스턴스 (p5en.48xlarge, p6-b200.48xlarge 등)에 최적화되어 있으며, 완전한 모니터링 스택과 자동화된 설정을 포함합니다.
 
 ## 🏗️ Architecture Overview
 
-### 주요 구성 요소 (AMP + AMG 권장 구성)
+### 주요 구성 요소
+
+**모니터링 옵션**:
+- `none`: 모니터링 없음 (최소 구성)
+- `self-hosting`: Standalone Prometheus + Grafana (t3.medium 인스턴스)
+- `amp-only`: AWS Managed Prometheus만 사용
+- `amp+amg`: AWS Managed Prometheus + Grafana (권장)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -48,9 +54,9 @@ AWS ParallelCluster를 사용한 분산 학습 환경 구축 솔루션입니다.
 │  │                                                                  │ │
 │  │  ┌────────────────────────┐      ┌──────────────────────────┐  │ │
 │  │  │   HeadNode             │      │   ComputeNodes           │  │ │
-│  │  │   (m5.8xlarge)         │      │   (p6-b200.48xlarge)     │  │ │
+│  │  │   (m5.8xlarge)         │      │   (GPU 인스턴스)         │  │ │
 │  │  ├────────────────────────┤      ├──────────────────────────┤  │ │
-│  │  │ • Slurm Controller     │      │ • 8x B200 GPUs (192GB)   │  │ │
+│  │  │ • Slurm Controller     │      │ • 8x GPUs (H100/B200)    │  │ │
 │  │  │ • NFS Server (/home)   │      │ • 192 vCPUs, 2TB RAM     │  │ │
 │  │  │ • Node Exporter :9100  │──┐   │ • 3.2Tbps Network (EFA)  │  │ │
 │  │  └────────────┬───────────┘  │   │ • DCGM Exporter :9400    │──┤ │
@@ -115,7 +121,6 @@ AWS ParallelCluster를 사용한 분산 학습 환경 구축 솔루션입니다.
 - ALB를 통한 HTTPS 접근
 - 클러스터와 독립적으로 운영
 
-📖 **상세 아키텍처 설명**: [guide/ARCHITECTURE.md](guide/ARCHITECTURE.md)
 📖 **AMP+AMG 설정 가이드**: [guide/AMP-AMG-SETUP.md](guide/AMP-AMG-SETUP.md)
 
 ## 📁 Directory Structure
@@ -124,34 +129,46 @@ AWS ParallelCluster를 사용한 분산 학습 환경 구축 솔루션입니다.
 .
 ├── README.md                                    # 이 파일
 ├── guide/                                       # 상세 가이드 문서
-│   ├── ARCHITECTURE.md                          # 아키텍처 상세 설명
-│   ├── CONFIGURATION.md                         # 클러스터 설정 가이드
-│   ├── INSTALLATION.md                          # 설치 가이드
-│   ├── MONITORING.md                            # 모니터링 설정
-│   ├── SECURITY.md                              # 보안 가이드
-│   └── TROUBLESHOOTING.md                       # 문제 해결
+│   ├── AMP-AMG-SETUP.md                         # AWS Managed Prometheus + Grafana 설정
+│   ├── DCGM-TO-CLOUDWATCH.md                    # GPU 메트릭 모니터링
+│   ├── EFA-MONITORING.md                        # EFA 네트워크 모니터링
+│   ├── NVLINK-MONITORING.md                     # NVLink 모니터링
+│   ├── PROMETHEUS-METRICS.md                    # Prometheus 메트릭 가이드
+│   ├── QUICKSTART-EFA-MONITORING.md             # 빠른 시작 가이드
+│   ├── CLUSTER-RECREATION-GUIDE.md              # 클러스터 재생성 가이드
+│   ├── TIMEOUT-CONFIGURATION.md                 # 타임아웃 설정 가이드
+│   └── README.md                                # 가이드 목차
 │
 ├── parallelcluster-infrastructure.yaml          # CloudFormation 인프라 템플릿
 ├── cluster-config.yaml.template                 # 클러스터 설정 템플릿
 ├── environment-variables.sh                     # 환경 변수 템플릿
+├── environment-variables-bailey.sh              # 환경 변수 예제 (bailey)
 │
-├── config/                                      # 설정 스크립트
-│   ├── monitoring/                              # 모니터링 인스턴스 (참고용)
-│   │   ├── README.md                            # ⚠️ UserData 자동 설치 방식 설명
+├── config/                                      # 노드 설정 스크립트 (S3 업로드용)
+│   ├── README.md                                # config 디렉토리 설명
+│   ├── STRUCTURE-SUMMARY.md                     # 구조 요약
+│   ├── monitoring/                              # 모니터링 인스턴스 설정
+│   │   ├── README.md                            # UserData 자동 설치 방식 설명
 │   │   └── setup-monitoring-instance.sh         # 수동 재설치용 (참고)
 │   ├── headnode/                                # HeadNode 설정
+│   │   └── setup-headnode.sh                    # Prometheus + CloudWatch
 │   ├── loginnode/                               # LoginNode 설정
+│   │   └── setup-loginnode.sh                   # 기본 도구 + CloudWatch
 │   ├── compute/                                 # ComputeNode 설정
-│   └── cloudwatch/                              # CloudWatch 설정
+│   │   └── setup-compute-node.sh                # GPU/CPU 모드별 설치
+│   ├── cloudwatch/                              # CloudWatch 설정
+│   │   ├── dcgm-to-cloudwatch.sh                # DCGM 메트릭 전송
+│   │   └── create-efa-dashboard.sh              # EFA 대시보드 생성
+│   ├── nccl/                                    # NCCL 설치 스크립트
+│   └── efa/                                     # EFA 드라이버 설치
 │
-├── scripts/                                     # 설치 스크립트 (S3 업로드용)
-│   ├── nccl/                                    # NCCL 설치 및 테스트
-│   ├── efa/                                     # EFA 드라이버
-│   ├── cloudwatch/                              # CloudWatch 에이전트
-│   └── shared-storage/                          # 공유 스토리지 설정
+├── scripts/                                     # 유틸리티 스크립트
+│   ├── check-compute-setup.sh                   # ComputeNode 설정 확인
+│   ├── monitor-compute-node-setup.sh            # 설치 진행 모니터링
+│   └── upload-monitoring-scripts.sh             # S3 업로드 스크립트
 │
-└── tests/                                       # 성능 테스트
-    └── nccl/                                    # NCCL 벤치마크
+└── security-best-practices/                     # 보안 가이드
+    └── SECURITY.md                              # 보안 모범 사례
 ```
 
 ## 📦 Prerequisites
@@ -224,7 +241,7 @@ aws cloudformation create-stack \
   --template-body file://parallelcluster-infrastructure.yaml \
   --parameters \
     ParameterKey=PrimarySubnetAZ,ParameterValue=${REGION}a \
-    ParameterKey=MonitoringType,ParameterValue=amp \
+    ParameterKey=MonitoringType,ParameterValue=amp-only \
   --capabilities CAPABILITY_IAM
 
 # AMP Workspace 정보 확인
@@ -275,15 +292,37 @@ aws cloudformation wait stack-create-complete \
   --region $REGION
 ```
 
-### 2. S3 버킷 및 스크립트 업로드
+### 2. S3 버킷 및 config 업로드
 
 ```bash
 # S3 버킷 생성
 aws s3 mb s3://my-pcluster-scripts --region us-east-2
 
-# 스크립트 업로드
-aws s3 sync scripts/ s3://my-pcluster-scripts/scripts/ --region us-east-2
+# config 디렉토리 업로드 (노드 설정 스크립트)
+# ⚠️ 중요: CustomActions가 이 스크립트들을 참조합니다
+aws s3 sync config/ s3://my-pcluster-scripts/config/ --region us-east-2
+
+# 업로드 확인
+aws s3 ls s3://my-pcluster-scripts/config/ --recursive
+
+# 예상 출력:
+# config/headnode/setup-headnode.sh
+# config/loginnode/setup-loginnode.sh
+# config/compute/setup-compute-node.sh
+# config/cloudwatch/dcgm-to-cloudwatch.sh
+# config/cloudwatch/create-efa-dashboard.sh
+# ... (기타 파일들)
 ```
+
+**config 디렉토리 구조**:
+- `headnode/`: HeadNode 설정 (Prometheus + CloudWatch)
+- `loginnode/`: LoginNode 설정 (기본 도구 + CloudWatch)
+- `compute/`: ComputeNode 설정 (GPU/CPU 모드별 설치)
+- `cloudwatch/`: CloudWatch 관련 스크립트
+- `nccl/`: NCCL 설치 스크립트
+- `efa/`: EFA 드라이버 설치
+
+📖 **상세 구조**: [config/README.md](config/README.md)
 
 ### 3. 클러스터 설정 생성
 
@@ -331,7 +370,7 @@ export AMP_POLICY_ARN="arn:aws:iam::123456789012:policy/parallelcluster-infra-am
 #     - Policy: ${AMP_POLICY_ARN}
 ```
 
-📖 **상세 설정 가이드**: [guide/CONFIGURATION.md](guide/CONFIGURATION.md)
+📖 **상세 설정 가이드**: [guide/QUICKSTART-EFA-MONITORING.md](guide/QUICKSTART-EFA-MONITORING.md)
 
 ### 4. 클러스터 생성
 
@@ -349,57 +388,35 @@ pcluster describe-cluster --cluster-name my-cluster
 
 세 가지 방법 중 선택하여 사용하세요:
 
-#### 방법 1: 공유 스토리지 활용 (권장)
+#### 방법 1: CustomActions 자동 설치 (권장)
 
-FSx Lustre에 한 번만 설치하고 모든 노드에서 참조:
-
-```bash
-# HeadNode에서 NCCL 설치 (한 번만, 10-15분 소요)
-ssh headnode
-sudo bash /fsx/nccl/install-nccl-shared.sh v2.28.7-1 v1.17.2-aws /fsx
-```
-
-**ComputeNode 자동 감지**:
-- ✅ **새로 시작되는 노드**: 자동으로 `/fsx/nccl/setup-nccl-env.sh` 감지 및 설정
-- ⚠️ **이미 실행 중인 노드**: 수동 적용 필요
+클러스터 생성 시 `environment-variables.sh`에서 설정:
 
 ```bash
-# 이미 실행 중인 ComputeNode에 적용 (클러스터 생성 후 NCCL 설치한 경우)
-bash /fsx/nccl/apply-nccl-to-running-nodes.sh
-
-# 또는 수동으로
-srun --nodes=ALL bash -c 'cat > /etc/profile.d/nccl-shared.sh << "EOF"
-source /fsx/nccl/setup-nccl-env.sh
-EOF
-chmod +x /etc/profile.d/nccl-shared.sh'
+# environment-variables.sh 설정
+export COMPUTE_SETUP_TYPE="gpu"  # GPU 인스턴스용
+# 또는
+export COMPUTE_SETUP_TYPE="cpu"  # CPU 인스턴스용
 ```
 
-**권장 워크플로우**:
-1. 클러스터 생성 (ComputeNode MinCount=0으로 설정)
-2. HeadNode에서 NCCL 설치
-3. Slurm job 제출 → ComputeNode 자동 시작 → NCCL 자동 감지 ✅
+**GPU 모드 (`COMPUTE_SETUP_TYPE="gpu"`)** - GPU 인스턴스용 (p5, p4d, g5, g4dn):
+- Docker + Pyxis (컨테이너 실행)
+- EFA Installer (고속 네트워킹)
+- DCGM Exporter (GPU 메트릭)
+- Node Exporter (시스템 메트릭)
+- CloudWatch Agent
+- 설치 시간: ~15-20분
 
-**장점**: 
-- 빠른 설치 (10-15분, 한 번만)
-- 스토리지 효율 (모든 노드가 공유)
-- 버전 일관성
-- 새 노드 자동 감지
+**CPU 모드 (`COMPUTE_SETUP_TYPE="cpu"`)** - CPU 인스턴스용 (c5, m5, r5):
+- Docker + Pyxis (컨테이너 실행)
+- CloudWatch Agent
+- 설치 시간: ~5-10분
 
-#### 방법 2: 클러스터 생성 시 자동 설치
+**비활성화 (`COMPUTE_SETUP_TYPE=""`)** - 최소 설정:
+- ParallelCluster 기본 설정만 사용
+- 설치 시간: ~2-3분
 
-`cluster-config.yaml`의 CustomActions로 빠른 설치 자동화:
-
-```yaml
-ComputeResources:
-  - Name: distributed-ml
-    CustomActions:
-      OnNodeConfigured:
-        Script: s3://my-bucket/config/compute/install-pyxis.sh
-```
-
-**주의**: NCCL 같은 시간이 오래 걸리는 작업(10-15분)은 WaitCondition 타임아웃(30분)을 유발할 수 있으므로 별도 설치 권장
-
-#### 방법 3: 컨테이너 사용
+#### 방법 2: 컨테이너 사용
 
 사전 구성된 컨테이너로 소프트웨어 설치 불필요:
 
@@ -411,8 +428,6 @@ srun --container-image=nvcr.io/nvidia/pytorch:24.01-py3 \
 ```
 
 **장점**: 설치 불필요, 재현 가능, 버전 관리 용이
-
-📖 **상세 설치 가이드**: [guide/INSTALLATION.md](guide/INSTALLATION.md)
 
 ### Bootstrap 타임아웃 설정
 
@@ -516,7 +531,7 @@ aws cloudformation describe-stacks \
 # 기본 로그인: admin / Grafana4PC!
 ```
 
-📖 **모니터링 설정 가이드**: [guide/MONITORING.md](guide/MONITORING.md)
+📖 **모니터링 설정 가이드**: [guide/AMP-AMG-SETUP.md](guide/AMP-AMG-SETUP.md)
 
 ### 7. NCCL 성능 테스트
 
@@ -555,7 +570,6 @@ squeue
 
 ### 모니터링 가이드
 
-- [CloudWatch 모니터링](guide/MONITORING.md) - 기본 모니터링 설정
 - [DCGM GPU 모니터링](guide/DCGM-TO-CLOUDWATCH.md) - GPU 메트릭 상세
 - [NVLink 모니터링](guide/NVLINK-MONITORING.md) - GPU 간 통신
 - [EFA 네트워크 모니터링](guide/EFA-MONITORING.md) - 노드 간 네트워크
@@ -590,8 +604,6 @@ squeue
 
 **On-Demand/Spot 사용 시**:
 - Placement Group 활성화 권장 (최적의 네트워크 성능)
-
-📖 **상세 가이드**: [guide/CONFIGURATION.md](guide/CONFIGURATION.md#️-capacity-block과-placement-group-제약사항)
 
 ### 인스턴스 타입 선택
 
@@ -631,20 +643,31 @@ ParallelCluster는 노드 배포 시 30분 WaitCondition 제한이 있습니다.
 - 공유 스토리지에 소프트웨어 설치 후 참조
 - Docker/Singularity 컨테이너 사용
 
-📖 **상세 가이드**: [guide/INSTALLATION.md](guide/INSTALLATION.md)
-
 ## 📊 Expected Performance
 
-### p6-b200.48xlarge 사양
+### GPU 인스턴스 사양 예시
 
+**p5en.48xlarge** (H100 기반):
+| 항목 | 사양 |
+|------|------|
+| vCPUs | 192 |
+| Memory | 2,048 GiB (2TB DDR5) |
+| GPUs | 8x NVIDIA H100 (80GB HBM3 each) |
+| Network | 3,200 Gbps (EFA) |
+| NVLink | 900 GB/s per direction |
+| Storage | 8x 3.84TB NVMe SSD |
+
+**p6-b200.48xlarge** (B200 기반):
 | 항목 | 사양 |
 |------|------|
 | vCPUs | 192 |
 | Memory | 2,048 GiB (2TB DDR5) |
 | GPUs | 8x NVIDIA B200 (192GB HBM3e each) |
-| Network | 3,200 Gbps |
+| Network | 3,200 Gbps (EFA) |
 | NVLink | 900 GB/s per direction |
 | Storage | 8x 3.84TB NVMe SSD |
+
+📖 **인스턴스 타입 설정**: [guide/INSTANCE-TYPE-CONFIGURATION.md](guide/INSTANCE-TYPE-CONFIGURATION.md)
 
 ### 성능 지표
 
@@ -675,11 +698,9 @@ aws ssm start-session \
   --parameters '{"portNumber":["3000"],"localPortNumber":["3000"]}'
 ```
 
-📖 **보안 가이드**: [guide/SECURITY.md](guide/SECURITY.md)
+📖 **보안 가이드**: [security-best-practices/SECURITY.md](security-best-practices/SECURITY.md)
 
 ## 🔍 Troubleshooting
-
-일반적인 문제 해결은 [guide/TROUBLESHOOTING.md](guide/TROUBLESHOOTING.md)를 참조하세요.
 
 **빠른 문제 해결**:
 

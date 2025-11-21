@@ -47,8 +47,8 @@ export FSxLustreFilesystemId=$(aws cloudformation describe-stacks --stack-name $
 # Fetch Monitoring Type
 export MONITORING_TYPE=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} --region ${AWS_REGION} --query 'Stacks[0].Outputs[?OutputKey==`MonitoringType`].OutputValue' --output text)
 
-# Fetch AMP outputs if MonitoringType is 'amp'
-if [ "$MONITORING_TYPE" = "amp" ]; then
+# Fetch AMP outputs if MonitoringType uses AMP (amp-only or amp+amg)
+if [ "$MONITORING_TYPE" = "amp-only" ] || [ "$MONITORING_TYPE" = "amp+amg" ]; then
     export AMP_WORKSPACE_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} --region ${AWS_REGION} --query 'Stacks[0].Outputs[?OutputKey==`AMPWorkspaceId`].OutputValue' --output text)
     export AMP_ENDPOINT=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} --region ${AWS_REGION} --query 'Stacks[0].Outputs[?OutputKey==`AMPPrometheusEndpoint`].OutputValue' --output text)
     export AMP_REMOTE_WRITE_POLICY_ARN=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} --region ${AWS_REGION} --query 'Stacks[0].Outputs[?OutputKey==`AMPRemoteWritePolicyArn`].OutputValue' --output text)
@@ -71,8 +71,8 @@ echo "✓ CloudFormation outputs fetched successfully"
 export IMDS_SUPPORT="v2.0"  # IMDSv2 for enhanced security (recommended)
 export OS_TYPE="ubuntu2204"  # OS: ubuntu2204, alinux2, centos7, rhel8, rocky8
 export SCHEDULER="slurm"  # Scheduler: slurm (only option for ParallelCluster 3.x)
-export KEY_PAIR_NAME="your-key-pair"  # ⚠️ CHANGE THIS: Your EC2 SSH key pair name, ubuntu2204 only support ed25519
-export CLUSTER_NAME="your-cluster-name"  # ⚠️ CHANGE THIS: Cluster name (used in CloudWatch logs)
+export KEY_PAIR_NAME="your-key-pair"  # ⚠️ CHANGE THIS: Your EC2 SSH key pair name
+export CLUSTER_NAME="your-cluster-name"  # ⚠️ CHANGE THIS: Cluster name (used in CloudWatch logs and pcluster commands)
 
 # ⚠️ IMPORTANT: S3 Bucket Configuration
 # The entire 'scripts/' folder must be uploaded to S3 for CustomActions to work properly.
@@ -127,7 +127,7 @@ export LOGIN_NODE_KEY_PAIR="${KEY_PAIR_NAME}"  # SSH key pair for login node acc
 # ------------------------------------------------------------------------------
 export QUEUE_NAME="compute-gpu"  # Queue name (used in Slurm: squeue, sbatch -p <queue>)
 export CAPACITY_TYPE="ONDEMAND"  # ONDEMAND (stable), SPOT (70% cheaper), CAPACITY_BLOCK (reserved)
-export PLACEMENT_GROUP_ENABLED="false"  # Placement group not recommended with Capacity Block (may cause capacity errors)
+export PLACEMENT_GROUP_ENABLED="true"  # Placement group not recommended with Capacity Block (may cause capacity errors)
 export JOB_EXCLUSIVE_ALLOCATION="true"  # Allocate entire node per job (recommended for GPU workloads)
 
 # SPOT Configuration (only if CAPACITY_TYPE=SPOT)
@@ -135,17 +135,17 @@ export SPOT_ALLOCATION_STRATEGY=""  # Optional: lowest-price (cheapest) or capac
 export SPOT_PRICE=""  # Optional: Max price in USD/hour (e.g., 0.50) - leave empty for on-demand price
 
 # Capacity Reservation (choose one or leave both empty for on-demand/spot)
-export CAPACITY_RESERVATION_ID=""  # ⚠️ CHANGE THIS: Your Capacity Reservation ID
+export CAPACITY_RESERVATION_ID=""  # ⚠️ Capacity Reservation ID for p5en.48xlarge
 export CAPACITY_RESERVATION_GROUP_ARN=""  # Optional: arn:aws:resource-groups:... for CR group
 
 # ------------------------------------------------------------------------------
 # ComputeResource Configuration
 # ------------------------------------------------------------------------------
 export COMPUTE_RESOURCE_NAME="distributed-ml"  # Resource name (identifier for this compute type)
-export COMPUTE_INSTANCE_TYPE="p6-b200.48xlarge"  # ⚠️ Instance: p6-b200.48xlarge (8x B200 192GB, 192 vCPU, 2TB RAM)
+export COMPUTE_INSTANCE_TYPE="m5.large"  # ⚠️ Instance: p5en.48xlarge (8x H100 80GB, 192 vCPU, 2TB RAM)
 export MIN_COUNT="2"  # Minimum nodes (Capacity Block requires MinCount > 0 and MinCount = MaxCount)
 export MAX_COUNT="2"  # Maximum nodes (must equal MinCount when using Capacity Block)
-export EFA_ENABLED="true"  # Enable EFA for 3.2Tbps networking (required for multi-node training)
+export EFA_ENABLED="false"  # Enable EFA for 3.2Tbps networking (required for multi-node training)
 
 # Compute Node Storage
 export COMPUTE_NODE_ROOT_VOLUME_SIZE="200"  # Root volume in GB (min: 35, recommended: 200+ for containers/datasets)
@@ -188,19 +188,25 @@ export EFA_INSTALLER_VERSION="latest"  # EFA driver version (latest recommended,
 # ------------------------------------------------------------------------------
 # CustomActions Enable/Disable (Timeout Prevention)
 # ------------------------------------------------------------------------------
-# 각 노드별 역할에 맞는 설치 항목:
-# - LoginNode: CloudWatch만 (최소 설치)
-# - HeadNode: CloudWatch + Prometheus (모니터링 수집)
-# - ComputeNode: 전체 GPU 스택 (EFA, NCCL, Docker, DCGM 등)
+# Role-based installation per node type:
+# - LoginNode: CloudWatch only (minimal installation)
+# - HeadNode: CloudWatch + Prometheus (metrics collection)
+# - ComputeNode: Full GPU stack (EFA, NCCL, Docker, DCGM, etc.)
 
-# LoginNode: 기본 개발 도구 + CloudWatch만 설치
-export ENABLE_LOGINNODE_SETUP="true"    # LoginNode 전용 설정 스크립트 (~2 min)
+# LoginNode: Basic dev tools + CloudWatch only
+export ENABLE_LOGINNODE_SETUP="true"    # LoginNode setup script (~2 min)
 
-# HeadNode: CloudWatch + Prometheus 설치
-export ENABLE_HEADNODE_SETUP="true"     # HeadNode 전용 설정 스크립트 (~5 min)
+# HeadNode: CloudWatch + Prometheus
+export ENABLE_HEADNODE_SETUP="true"     # HeadNode setup script (~5 min)
 
-# ComputeNode: 전체 GPU 스택 설치
-export ENABLE_COMPUTE_SETUP="true"      # ComputeNode 전용 설정 스크립트 (~15-20 min)
+# ComputeNode: Setup configuration
+# ⚠️ Choose setup type based on your workload
+export COMPUTE_SETUP_TYPE="cpu"         # ComputeNode setup type: "gpu" or "cpu" or "" (disabled)
+                                         # "gpu"  : Docker + Pyxis + EFA + DCGM + Node Exporter (~15-20 min)
+                                         #          For GPU instances: p5, p4d, g5, g4dn
+                                         # "cpu"  : Docker + Pyxis only (~5-10 min)
+                                         #          For CPU instances: c5, m5, r5
+                                         # ""     : No setup (minimal cluster for testing)
 
 # ------------------------------------------------------------------------------
 # Monitoring Configuration
@@ -428,18 +434,19 @@ export DIRECTORY_SERVICE_CONFIG=""
 export LOGIN_NODE_CUSTOM_ACTIONS_CONFIG=""
 LOGIN_NODE_CUSTOM_ACTIONS=""
 
-# LoginNode Setup (최소 설치: CloudWatch + 기본 도구)
+# LoginNode Setup (minimal: CloudWatch + basic tools)
 if [ -n "$ENABLE_LOGINNODE_SETUP" ] && [ "$ENABLE_LOGINNODE_SETUP" = "true" ]; then
     if [ -z "$S3_BUCKET" ]; then
         echo "⚠️  Warning: ENABLE_LOGINNODE_SETUP=true but S3_BUCKET is not configured"
     else
-        LOGIN_NODE_CUSTOM_ACTIONS="${LOGIN_NODE_CUSTOM_ACTIONS}- Script: 's3://${S3_BUCKET}/scripts/loginnode/setup-loginnode.sh'
+        LOGIN_NODE_CUSTOM_ACTIONS="${LOGIN_NODE_CUSTOM_ACTIONS}- Script: 's3://${S3_BUCKET}/config/loginnode/setup-loginnode.sh'
               Args:
                 - ${CLUSTER_NAME}
                 - ${AWS_REGION}
                 - ${S3_BUCKET}
+                - ${MONITORING_TYPE}
             "
-        echo "✓ LoginNode setup enabled (CloudWatch + 기본 도구)"
+        echo "✓ LoginNode setup enabled (CloudWatch + basic tools)"
     fi
 fi
 
@@ -483,11 +490,18 @@ fi
 # AMP (AWS Managed Prometheus) Configuration Processing
 # ------------------------------------------------------------------------------
 export AMP_POLICY_CONFIG=""
-if [ "$MONITORING_TYPE" = "amp" ] && [ -n "$AMP_REMOTE_WRITE_POLICY_ARN" ]; then
-    export AMP_POLICY_CONFIG="- Policy: ${AMP_REMOTE_WRITE_POLICY_ARN}"
-    echo "✓ AMP IAM Policy added: ${AMP_REMOTE_WRITE_POLICY_ARN}"
-    echo "  - AMP Workspace: ${AMP_WORKSPACE_ID}"
-    echo "  - AMP Endpoint: ${AMP_ENDPOINT}"
+if [ "$MONITORING_TYPE" = "amp-only" ] || [ "$MONITORING_TYPE" = "amp+amg" ]; then
+    if [ -n "$AMP_REMOTE_WRITE_POLICY_ARN" ]; then
+        export AMP_POLICY_CONFIG="- Policy: ${AMP_REMOTE_WRITE_POLICY_ARN}"
+        echo "✓ AMP IAM Policy configured for HeadNode:"
+        echo "  - Policy ARN: ${AMP_REMOTE_WRITE_POLICY_ARN}"
+        echo "  - AMP Workspace: ${AMP_WORKSPACE_ID}"
+        echo "  - AMP Endpoint: ${AMP_ENDPOINT}"
+    else
+        echo "⚠️  Warning: MONITORING_TYPE is ${MONITORING_TYPE} but AMP_REMOTE_WRITE_POLICY_ARN is empty"
+        echo "   This will cause Prometheus remote_write to fail (403 Forbidden)"
+        echo "   Check CloudFormation stack outputs for AMPRemoteWritePolicyArn"
+    fi
 fi
 
 # ------------------------------------------------------------------------------
@@ -502,12 +516,18 @@ if [ -n "$ENABLE_HEADNODE_SETUP" ] && [ "$ENABLE_HEADNODE_SETUP" = "true" ]; the
         echo "⚠️  Warning: ENABLE_HEADNODE_SETUP=true but S3_BUCKET is not configured"
     else
         HEADNODE_CUSTOM_ACTIONS="${HEADNODE_CUSTOM_ACTIONS}
-        - Script: 's3://${S3_BUCKET}/scripts/headnode/setup-headnode.sh'
+        - Script: 's3://${S3_BUCKET}/config/headnode/setup-headnode.sh'
           Args:
             - ${CLUSTER_NAME}
             - ${AWS_REGION}
-            - ${S3_BUCKET}"
+            - ${S3_BUCKET}
+            - ${MONITORING_TYPE}
+            - ${AMP_ENDPOINT}"
         echo "✓ HeadNode setup enabled (CloudWatch + Prometheus)"
+        if [ "$MONITORING_TYPE" = "amp-only" ] || [ "$MONITORING_TYPE" = "amp+amg" ]; then
+            echo "  → AMP remote_write will be configured"
+            echo "  → AMP Endpoint: ${AMP_ENDPOINT}"
+        fi
     fi
 fi
 
@@ -520,23 +540,55 @@ export HEADNODE_CUSTOM_ACTION_CONFIG="${HEADNODE_CUSTOM_ACTIONS}"
 export CLOUDWATCH_CUSTOM_ACTION_CONFIG=""
 COMPUTE_CUSTOM_ACTIONS=""
 
-# ComputeNode Setup (전체 GPU 스택: EFA, NCCL, Docker, DCGM 등)
-if [ -n "$ENABLE_COMPUTE_SETUP" ] && [ "$ENABLE_COMPUTE_SETUP" = "true" ]; then
+# ComputeNode Setup
+if [ -n "$COMPUTE_SETUP_TYPE" ]; then
     if [ -z "$S3_BUCKET" ]; then
-        echo "⚠️  Warning: ENABLE_COMPUTE_SETUP=true but S3_BUCKET is not configured"
+        echo "⚠️  Warning: COMPUTE_SETUP_TYPE='${COMPUTE_SETUP_TYPE}' but S3_BUCKET is not configured"
     else
-        COMPUTE_CUSTOM_ACTIONS="${COMPUTE_CUSTOM_ACTIONS}- Script: 's3://${S3_BUCKET}/scripts/compute/setup-compute-node.sh'
+        COMPUTE_CUSTOM_ACTIONS="${COMPUTE_CUSTOM_ACTIONS}- Script: 's3://${S3_BUCKET}/config/compute/setup-compute-node.sh'
               Args:
                 - ${CLUSTER_NAME}
                 - ${AWS_REGION}
                 - ${S3_BUCKET}
+                - ${MONITORING_TYPE}
+                - ${COMPUTE_SETUP_TYPE}
             "
-        echo "✓ ComputeNode setup enabled (EFA + NCCL + Docker + DCGM + CloudWatch)"
+        
+        if [ "$COMPUTE_SETUP_TYPE" = "gpu" ]; then
+            echo "✓ ComputeNode setup enabled: GPU mode"
+            echo "  → Docker + Pyxis"
+            echo "  → EFA Installer (high-speed networking)"
+            echo "  → DCGM Exporter (GPU metrics)"
+            echo "  → Node Exporter (system metrics)"
+            echo "  → CloudWatch Agent"
+        elif [ "$COMPUTE_SETUP_TYPE" = "cpu" ]; then
+            echo "✓ ComputeNode setup enabled: CPU mode"
+            echo "  → Docker + Pyxis"
+            echo "  → CloudWatch Agent"
+        else
+            echo "⚠️  Warning: Unknown COMPUTE_SETUP_TYPE='${COMPUTE_SETUP_TYPE}'"
+            echo "   Valid values: 'gpu', 'cpu', or '' (empty for no setup)"
+        fi
     fi
+else
+    echo "⚠️  ComputeNode CustomActions DISABLED (COMPUTE_SETUP_TYPE is empty)"
+    echo "   Cluster will start with minimal configuration (ParallelCluster defaults only)"
 fi
 
 # Export final ComputeFleet CustomActions config
-export CLOUDWATCH_CUSTOM_ACTION_CONFIG="${COMPUTE_CUSTOM_ACTIONS}"
+if [ -z "${COMPUTE_CUSTOM_ACTIONS}" ]; then
+    # If no custom actions, don't include CustomActions section at all
+    export COMPUTE_CUSTOM_ACTIONS_CONFIG="# CustomActions disabled for testing"
+    echo "⚠️  ComputeNode CustomActions DISABLED"
+    echo "   Cluster will start with minimal configuration (ParallelCluster defaults only)"
+    echo "   To enable: Set COMPUTE_SETUP_TYPE='gpu' or 'cpu' in environment-variables.sh"
+else
+    # Include full CustomActions section
+    export COMPUTE_CUSTOM_ACTIONS_CONFIG="CustomActions:
+        OnNodeConfigured:
+          Sequence:
+            ${COMPUTE_CUSTOM_ACTIONS}"
+fi
 
 # ------------------------------------------------------------------------------
 # Tags Configuration Processing
@@ -588,11 +640,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "📋 Next Steps:"
 echo ""
-echo "   1. Upload all scripts to S3 (REQUIRED for CustomActions):"
-echo "      aws s3 sync scripts/ s3://${S3_BUCKET}/scripts/ --region ${AWS_REGION}"
+echo "   1. Upload all config to S3 (REQUIRED for CustomActions):"
+echo "      aws s3 sync config/ s3://${S3_BUCKET}/config/ --region ${AWS_REGION}"
 echo ""
-echo "   2. Verify scripts uploaded successfully:"
-echo "      aws s3 ls s3://${S3_BUCKET}/scripts/ --recursive"
+echo "   2. Verify config uploaded successfully:"
+echo "      aws s3 ls s3://${S3_BUCKET}/config/ --recursive"
 echo ""
 echo "   3. Verify envsubst is installed:"
 echo "      which envsubst || sudo apt-get install -y gettext-base"
