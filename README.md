@@ -97,36 +97,36 @@ python3 -m venv pcluster-venv
 source pcluster-venv/bin/activate
 pip install --upgrade "aws-parallelcluster==3.14.0"
 
-# envsubst (템플릿 변수 치환)
+# envsubst (template variable substitution)
 # MacOS
 curl -L https://github.com/a8m/envsubst/releases/download/v1.2.0/envsubst-`uname -s`-`uname -m` -o envsubst
 chmod +x envsubst && sudo mv envsubst /usr/local/bin
 
-# Linux (CloudShell에는 기본 설치됨)
+# Linux (CloudShell already includes it by default)
 sudo yum install -y gettext  # Amazon Linux
 # sudo apt-get install -y gettext-base  # Ubuntu
 
-# AWS 자격 증명 설정
-# region은 클러스터를 배포할 리전과 일치해야함, cluster-config.yaml 파일에서 참조함
+# AWS credential configuration
+# Region must match the region where the cluster will be deployed, referenced in cluster-config.yaml
 aws configure
 ```
 
 ## 🚀 Quick Start
 
-### 1. 인프라 배포
+### 1. Deploy Infrastructure
 
-**모니터링 옵션**:
-- `none`: 모니터링 없음 (최소 구성)
-- `self-hosting`: Standalone Prometheus + Grafana (t3.medium 인스턴스)
-- `amp-only`: AWS Managed Prometheus만 사용
-- `amp+amg`: AWS Managed Prometheus + Grafana (권장)
+**Monitoring Options**:
+- `none`: no monitoring (minimal setup)
+- `self-hosting`: Standalone Prometheus + Grafana (t3.medium instance)
+- `amp-only`: AWS Managed Prometheus only
+- `amp+amg`: AWS Managed Prometheus + Grafana (recommended)
 
 ```bash
-# 현재 IP 확인
+# Check your current public IP
 MY_IP=$(curl -s https://checkip.amazonaws.com)
 echo "Your IP: $MY_IP"
 
-# [none] 기본 배포 (최소 설정)
+# [none] basic deployment (minimal configuration)
 REGION="us-east-2"
 aws cloudformation create-stack \
   --stack-name parallelcluster-infra \
@@ -152,7 +152,7 @@ aws cloudformation create-stack \
     ParameterKey=AllowedIPsForALB,ParameterValue="${MY_IP}/32" \
   --capabilities CAPABILITY_IAM
 
-# [amp-only] AWS Managed Prometheus (AMP) 사용 (자동 생성)
+# [amp-only]  Use AWS Managed Prometheus (AMP) (provisioned automatically)
 aws cloudformation create-stack \
   --stack-name parallelcluster-infra \
   --region $REGION \
@@ -162,7 +162,7 @@ aws cloudformation create-stack \
     ParameterKey=MonitoringType,ParameterValue=amp-only \
   --capabilities CAPABILITY_IAM
 
-## AMP Workspace 정보 확인
+## Check AMP Workspace details
 AMP_WORKSPACE_ID=$(aws cloudformation describe-stacks \
   --stack-name parallelcluster-infra \
   --query 'Stacks[0].Outputs[?OutputKey==`AMPWorkspaceId`].OutputValue' \
@@ -176,15 +176,16 @@ AMP_ENDPOINT=$(aws cloudformation describe-stacks \
 echo "AMP Workspace ID: $AMP_WORKSPACE_ID"
 echo "AMP Endpoint: $AMP_ENDPOINT"
 
-# ⚠️ 참고: AMP Endpoint를 브라우저로 접근하면 <HttpNotFoundException/>가 표시됩니다.
-# 이는 정상 동작입니다! AMP는 Prometheus remote_write API만 제공하며,
-# 메트릭 조회는 Grafana를 통해서만 가능합니다.
+# ⚠️ Note: Accessing AMP endpoint via browser results in <HttpNotFoundException/>
+# This is expected behavior.
+# AMP supports only Prometheus remote_write API,
+# metric queries must be done via Grafana.
 
-## AMP Workspace 상태 확인 (ACTIVE여야 정상)
+## Check AMP Workspace status (must be ACTIVE)
 aws amp describe-workspace --workspace-id $AMP_WORKSPACE_ID \
   --query 'workspace.status.statusCode' --output text
 
-# [amp+amg] 완전 관리형 모니터링 배포 (AMP + AMG, 권장)
+# [amp+amg] Fully managed monitoring (AMP + AMG, recommended)
 aws cloudformation create-stack \
   --stack-name parallelcluster-infra \
   --region $REGION \
@@ -194,58 +195,60 @@ aws cloudformation create-stack \
     ParameterKey=MonitoringType,ParameterValue=amp+amg \
   --capabilities CAPABILITY_NAMED_IAM
 
-# 배포 완료 대기 (~5-8분)
+# Wait for deployment to complete (~5-8 minutes)
 aws cloudformation wait stack-create-complete \
   --stack-name parallelcluster-infra \
   --region $REGION
 ```
 
-### 2. S3 버킷 및 config 업로드
+### 2. S3 Bucket and Config Upload
 
-ParallelCluster 배포 시 S3 Bucket 등록은 필수가 아닙니다. 다만 본 에셋에서는 자동화 스크립트를 배포 시 참조하므로 S3에 스크립트 업로드가 필요합니다.
+Registering an S3 bucket is not required during ParallelCluster deployment. However, for this asset, scripts are referenced during automation, so uploading them to S3 is necessary.
 
 ```bash
-# S3 버킷 생성
+# Create S3 bucket
 aws s3 mb s3://my-pcluster-scripts --region us-east-2
 
-# config 디렉토리 업로드 (노드 설정 스크립트)
-# ⚠️ 중요: CustomActions가 이 스크립트들을 참조합니다
+# Upload config directory (node setup scripts)
+# ⚠️ Important: CustomActions will reference these scripts
 aws s3 sync config/ s3://my-pcluster-scripts/config/ --region us-east-2
 
-# 업로드 확인
+# Verify upload
 aws s3 ls s3://my-pcluster-scripts/config/ --recursive
 
-# 예상 출력:
+# Expected output:
 # config/headnode/setup-headnode.sh
 # config/loginnode/setup-loginnode.sh
 # config/compute/setup-compute-node.sh
 # config/cloudwatch/dcgm-to-cloudwatch.sh
 # config/cloudwatch/create-efa-dashboard.sh
-# ... (기타 파일들)
+# ... (other files)
 ```
 
-**config 디렉토리 구조**:
-- `headnode/`: HeadNode 설정 (Prometheus + CloudWatch)
-- `loginnode/`: LoginNode 설정 (기본 도구 + CloudWatch)
-- `compute/`: ComputeNode 설정 (GPU/CPU 모드별 설치)
-- `cloudwatch/`: CloudWatch 관련 스크립트
-- `nccl/`: NCCL 설치 스크립트
-- `efa/`: EFA 드라이버 설치
+**Config Directory Structure:**:
+- `headnode/`: HeadNode configuration (Prometheus + CloudWatch)
+- `loginnode/`: LoginNode configuration (base tools + CloudWatch)
+- `compute/`: ComputeNode configuration (GPU/CPU mode install)
+- `cloudwatch/`: CloudWatch CloudWatch-related scripts
+- `nccl/`: NCCL installation scripts
+- `efa/`: EFA EFA driver installation
 
-📖 **상세 구조**: [config/README.md](config/README.md)
+📖 **Detailed structure**: [config/README.md](config/README.md)
 
-### 3. 클러스터 설정 생성
+### 3. Generate Cluster Configuration
 
 ```bash
-# 환경 변수 설정
+# Define environment variables
 vim environment-variables.sh
-# 필수 수정 항목:
+# Required settings:
 # - STACK_NAME
 # - KEY_PAIR_NAME
 # _ CLUSTER_NAME
 # - S3_BUCKET
 
-# 커스텀 항목
+
+# Additional configurations
+
 # HeadNode Configuration
 # LoginNode Configuration
 # Compute Queue Configuration
@@ -253,26 +256,26 @@ vim environment-variables.sh
 # CustomActions Enable/Disable
 
 
-# 환경 변수 로드 및 설정 생성
+# Load variables and generate config
 source environment-variables.sh
 envsubst < cluster-config.yaml.template > cluster-config.yaml
 ```
 
-### 4. 클러스터 생성
+### 4. Create Cluster
 
 ```bash
-# 클러스터 생성 (my-cluster는 CLUSTER_NAME과 동일해야함)
+# Create cluster (my-cluster must match CLUSTER_NAME))
 pcluster create-cluster \
   --cluster-name my-cluster \
   --cluster-configuration cluster-config.yaml
 
-# 생성 상태 확인
+# Check creation status
 pcluster describe-cluster --cluster-name my-cluster
 ```
 
-**클러스터 생성 중 문제가 발생한 경우**:
-- 📖 **클러스터 상태 모니터링 및 로그 확인**: [아래 모니터링 섹션 참조](#클러스터-상태-모니터링)
-- 📖 **로그 내보내기 상세 가이드**: [AWS ParallelCluster 로그 내보내기](https://docs.aws.amazon.com/ko_kr/parallelcluster/latest/ug/pcluster.export-cluster-logs-v3.html)
+**If issues occur during cluster creation**:
+- 📖 **Monitor cluster status & view logs**: [아래 모니터링 섹션 참조](#클러스터-상태-모니터링)
+- 📖 **Detailed log export guide**: [AWS ParallelCluster 로그 내보내기](https://docs.aws.amazon.com/ko_kr/parallelcluster/latest/ug/pcluster.export-cluster-logs-v3.html)
 
 ### 5. 소프트웨어 설치
 
