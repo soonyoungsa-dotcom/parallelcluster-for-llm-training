@@ -2,41 +2,41 @@
 
 ![Architecture Diagram](img/architecture.png)
 
-AWS ParallelCluster를 사용한 분산 학습 환경 구축을 위한 에셋입니다. GPU 및 CPU 인스턴스를 컴퓨트 노드로 활용할 수 있으며, 모니터링 스택과 자동화된 설정을 포함합니다.
+AWS ParallelCluster assets for building a distributed training environment. Supports using GPU and CPU instances as compute nodes, and includes a monitoring stack and automated configuration.
 
 ## 🏗️ Architecture Overview
 
-### 노드 역할
+### Node Roles
 
 - **LoginNode Pool (Optional)**: 
-  - 사용자 SSH 접근 및 작업 제출 전용
-  - 데이터 전처리 및 간단한 작업 수행
-  - HeadNode의 컴퓨팅 리소스 보호
-  - Public Subnet (특정 IP만 SSH 허용)
+  - For user SSH access and job submission
+  - Performs data preprocessing and simple tasks
+  - Protects the HeadNode’s compute resources
+  - Public Subnet (SSH allowed only from specific IPs)
   
 - **HeadNode**: 
-  - Slurm 스케줄러 및 작업 관리
-  - NFS 서버 역할 (/home 공유)
-  - Private Subnet에 위치 (보안)
+  - Slurm scheduler and job management
+  - Functions as NFS server (shared /home)
+  - Located in a Private Subnet (security)
   
 - **ComputeNodes**: 
-  - GPU 워크로드 실행 전용
-  - Private Subnet에 위치
-  - Auto-scaling 지원 (Slurm 연동)
-  - EFA 네트워크로 노드 간 고속 통신
+  - Dedicated for GPU workload execution
+  - Located in a Private Subnet
+  - Supports auto-scaling (Slurm integrated)
+  - High-speed inter-node communication via EFA
 
-### 모니터링 아키텍처
+### Monitoring Architecture
 
-**AWS Managed Services (권장)**:
-- **Amazon Managed Prometheus (AMP)**: 메트릭 저장 및 쿼리
-- **Amazon Managed Grafana (AMG)**: 대시보드 및 시각화
-- **장점**: 관리 부담 없음, 고가용성, 자동 스케일링, AWS SSO 통합
+**AWS Managed Services (Recommended)**:
+- **Amazon Managed Prometheus (AMP)**: Metric storage and query
+- **Amazon Managed Grafana (AMG)**: Dashboarding and visualization
+- **Advantages**: No maintenance burden, high availability, automatic scaling, AWS SSO integration
 
-**Self-hosting (대안)**:
+**Self-hosting (Alternative)**:
 - Standalone Monitoring Instance (t3.medium)
-- Prometheus + Grafana 직접 운영
-- ALB를 통한 HTTPS 접근
-- 클러스터와 독립적으로 운영
+- Operate Prometheus + Grafana manually
+- HTTPS access via ALB
+- Operates independently from the cluster
 
 ## 📁 Directory Structure
 ```bash
