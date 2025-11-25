@@ -39,51 +39,50 @@ AWS ParallelCluster를 사용한 분산 학습 환경 구축을 위한 에셋입
 - 클러스터와 독립적으로 운영
 
 ## 📁 Directory Structure
-
-```
+```bash
 .
-├── README.md                                    # 이 파일
-├── guide/                                       # 상세 가이드 문서
-│   ├── AMP-AMG-SETUP.md                         # AWS Managed Prometheus + Grafana 설정
-│   ├── DCGM-TO-CLOUDWATCH.md                    # GPU 메트릭 모니터링
-│   ├── EFA-MONITORING.md                        # EFA 네트워크 모니터링
-│   ├── NVLINK-MONITORING.md                     # NVLink 모니터링
-│   ├── PROMETHEUS-METRICS.md                    # Prometheus 메트릭 가이드
-│   ├── QUICKSTART-EFA-MONITORING.md             # 빠른 시작 가이드
-│   ├── CLUSTER-RECREATION-GUIDE.md              # 클러스터 재생성 가이드
-│   ├── TIMEOUT-CONFIGURATION.md                 # 타임아웃 설정 가이드
-│   └── README.md                                # 가이드 목차
+├── README.md                                    # This file
+├── guide/                                       # Detailed guide documents
+│   ├── AMP-AMG-SETUP.md                         # AWS Managed Prometheus + Grafana setup
+│   ├── DCGM-TO-CLOUDWATCH.md                    # GPU metric monitoring
+│   ├── EFA-MONITORING.md                        # EFA network monitoring
+│   ├── NVLINK-MONITORING.md                     # NVLink monitoring
+│   ├── PROMETHEUS-METRICS.md                    # Prometheus metric guide
+│   ├── QUICKSTART-EFA-MONITORING.md             # Quick start guide
+│   ├── CLUSTER-RECREATION-GUIDE.md              # Cluster re-creation guide
+│   ├── TIMEOUT-CONFIGURATION.md                 # Timeout configuration guide
+│   └── README.md                                # Guide index
 │
-├── parallelcluster-infrastructure.yaml          # CloudFormation 인프라 템플릿
-├── cluster-config.yaml.template                 # 클러스터 설정 템플릿
-├── environment-variables.sh                     # 환경 변수 템플릿
-├── environment-variables-bailey.sh              # 환경 변수 예제 (bailey)
+├── parallelcluster-infrastructure.yaml          # CloudFormation infrastructure template
+├── cluster-config.yaml.template                 # Cluster config template
+├── environment-variables.sh                     # Environment variable template
+├── environment-variables-bailey.sh              # Environment variable example (bailey)
 │
-├── config/                                      # 노드 설정 스크립트 (S3 업로드용)
-│   ├── README.md                                # config 디렉토리 설명
-│   ├── STRUCTURE-SUMMARY.md                     # 구조 요약
-│   ├── monitoring/                              # 모니터링 인스턴스 설정
-│   │   ├── README.md                            # UserData 자동 설치 방식 설명
-│   │   └── setup-monitoring-instance.sh         # 수동 재설치용 (참고)
-│   ├── headnode/                                # HeadNode 설정
+├── config/                                      # Node setup scripts (for S3 upload)
+│   ├── README.md                                # Description of config directory
+│   ├── STRUCTURE-SUMMARY.md                     # Structure summary
+│   ├── monitoring/                              # Monitoring instance setup
+│   │   ├── README.md                            # UserData auto-install description
+│   │   └── setup-monitoring-instance.sh         # Manual reinstallation (optional)
+│   ├── headnode/                                # HeadNode setup
 │   │   └── setup-headnode.sh                    # Prometheus + CloudWatch
-│   ├── loginnode/                               # LoginNode 설정
-│   │   └── setup-loginnode.sh                   # 기본 도구 + CloudWatch
-│   ├── compute/                                 # ComputeNode 설정
-│   │   └── setup-compute-node.sh                # GPU/CPU 모드별 설치
-│   ├── cloudwatch/                              # CloudWatch 설정
-│   │   ├── dcgm-to-cloudwatch.sh                # DCGM 메트릭 전송
-│   │   └── create-efa-dashboard.sh              # EFA 대시보드 생성
-│   ├── nccl/                                    # NCCL 설치 스크립트
-│   └── efa/                                     # EFA 드라이버 설치
+│   ├── loginnode/                               # LoginNode setup
+│   │   └── setup-loginnode.sh                   # Basic tools + CloudWatch
+│   ├── compute/                                 # ComputeNode setup
+│   │   └── setup-compute-node.sh                # GPU/CPU installation modes
+│   ├── cloudwatch/                              # CloudWatch setup
+│   │   ├── dcgm-to-cloudwatch.sh                # DCGM metric export
+│   │   └── create-efa-dashboard.sh              # EFA dashboard creation
+│   ├── nccl/                                    # NCCL installation scripts
+│   └── efa/                                     # EFA driver installation
 │
-├── scripts/                                     # 유틸리티 스크립트
-│   ├── check-compute-setup.sh                   # ComputeNode 설정 확인
-│   ├── monitor-compute-node-setup.sh            # 설치 진행 모니터링
-│   └── upload-monitoring-scripts.sh             # S3 업로드 스크립트
+├── scripts/                                     # Utility scripts
+│   ├── check-compute-setup.sh                   # Verify compute node setup
+│   ├── monitor-compute-node-setup.sh            # Monitor installation progress
+│   └── upload-monitoring-scripts.sh             # Upload scripts to S3
 │
-└── security-best-practices/                     # 보안 가이드
-    └── SECURITY.md                              # 보안 모범 사례
+└── security-best-practices/                     # Security guidelines
+    └── SECURITY.md                              # Security best practices
 ```
 
 ## 📦 Prerequisites
