@@ -4,11 +4,11 @@ This guide explains how to selectively configure the required components when us
 
 ## 📋 Table of Contents
 
-- [Instance Type Characteristics](#instance-type-characteristics)
-- [Configuration Method](#configuration-method)
-- [Recommended Instance Type-Specific Settings](#recommended-instance-type-specific-settings)
-- [Component Descriptions](#component-descriptions)
-- [Application Method](#application-method)
+- [Instance Type Characteristics](#Instance-Type-Characteristics)
+- [Configuration Method](#Configuration-Method)
+- [Recommended Instance Type-Specific Settings](#Recommended-Instance-Type-Specific-Settings)
+- [Component Descriptions](#Component-Descriptions)
+- [Application Method](#Application-Method)
 
 ## 🎯 Instance Type Characteristics
 
