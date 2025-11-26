@@ -274,340 +274,341 @@ pcluster describe-cluster --cluster-name my-cluster
 ```
 
 **If issues occur during cluster creation**:
-- 📖 **Monitor cluster status & view logs**: [아래 모니터링 섹션 참조](#클러스터-상태-모니터링)
-- 📖 **Detailed log export guide**: [AWS ParallelCluster 로그 내보내기](https://docs.aws.amazon.com/ko_kr/parallelcluster/latest/ug/pcluster.export-cluster-logs-v3.html)
+- 📖 **Monitor cluster status & view logs**: [See the monitoring section below](#Monitoring-Cluster-Status)
+- 📖 **Detailed log export guide**: [Exporting AWS ParallelCluster Logs](https://docs.aws.amazon.com/ko_kr/parallelcluster/latest/ug/pcluster.export-cluster-logs-v3.html)
 
-### 5. 소프트웨어 설치
+### 5. Software Installation
 
-세 가지 방법 중 선택하여 사용하세요:
+Choose one of the three methods:
 
-**방법 선택 가이드**:
+**Method Selection Guide**:
 
-| 방법 | 설치 시점 | 설치 시간 | 타임아웃 위험 | 권장 용도 |
-|------|-----------|-----------|---------------|-----------|
-| **1. CustomActions** | 클러스터 생성 시 | 15-20분 | 중간 | 기본 GPU/CPU 환경 |
-| **2. FSx 공유** | 클러스터 생성 후 | 10-15분 (1회) | 없음 | NCCL 등 대용량 라이브러리 |
-| **3. 컨테이너** | 실행 시 | 즉시 | 없음 | 완전한 재현성 필요 시 |
+| Method | Installation Timing | Installation Time | Timeout Risk | Recommended Use Case |
+|--------|-------------------|-------------------|--------------|----------------------|
+| **1. CustomActions** | During cluster creation | 15-20 minutes | Medium | Basic GPU/CPU environment |
+| **2. FSx Shared** | After cluster creation | 10-15 minutes (one-time) | None | Large libraries like NCCL |
+| **3. Containers** | At runtime | Immediate | None | Require full reproducibility |
 
-**조합 추천**:
-- 방법 1 (기본 환경) + 방법 2 (NCCL) + 방법 3 (워크로드)
-- 또는 방법 3만 사용 (가장 간단)
+**Recommended Combination**:
+- Method 1 (Basic environment) + Method 2 (NCCL) + Method 3 (Workload)
+- Or use Method 3 only (simplest)
 
-#### 방법 1: CustomActions 자동 설치 (Timeout 방지를 위해 경량화 추천)
+#### Method 1: Automatic Installation with CustomActions (Recommended to Optimize for Timeout)
 
-클러스터 생성 시 `environment-variables.sh`에서 설정:
+Set in `environment-variables.sh` during cluster creation:
 
 ```bash
-# environment-variables.sh 설정
-export COMPUTE_SETUP_TYPE="gpu"  # GPU 인스턴스용
-# 또는
-export COMPUTE_SETUP_TYPE="cpu"  # CPU 인스턴스용
+# environment-variables.sh configuration
+export COMPUTE_SETUP_TYPE="gpu"  # For GPU instances
+# or
+export COMPUTE_SETUP_TYPE="cpu"  # For CPU instances
 ```
 
-**GPU 모드 (`COMPUTE_SETUP_TYPE="gpu"`)** - GPU 인스턴스용 (p5, p4d, g5, g4dn):
-- Docker + Pyxis (컨테이너 실행)
-- EFA Installer (고속 네트워킹)
-- DCGM Exporter (GPU 메트릭)
-- Node Exporter (시스템 메트릭)
+**GPU Mode (`COMPUTE_SETUP_TYPE="gpu"")** - For GPU instances (p5, p4d, g5, g4dn):
+- Docker + Pyxis (Container execution)
+- EFA Installer (High-speed networking)
+- DCGM Exporter (GPU metrics)
+- Node Exporter (System metrics)
 - CloudWatch Agent
-- 설치 시간: ~15-20분
+- Installation time: ~15-20 minutes
 
-**CPU 모드 (`COMPUTE_SETUP_TYPE="cpu"`)** - CPU 인스턴스용 (c5, m5, r5):
-- Docker + Pyxis (컨테이너 실행)
+**CPU Mode (`COMPUTE_SETUP_TYPE="cpu"")** - For CPU instances (c5, m5, r5):
+- Docker + Pyxis (Container execution)
 - CloudWatch Agent
-- 설치 시간: ~5-10분
+- Installation time: ~5-10 minutes
 
-**비활성화 (`COMPUTE_SETUP_TYPE=""`)** - 최소 설정:
-- CustomActions 수행 하지 않음
-- 설치 시간: ~2-3분
+**Disabled (`COMPUTE_SETUP_TYPE=""")** - Minimal setup:
+- CustomActions not performed
+- Installation time: ~2-3 minutes
 
-#### 방법 2: FSx 공유 스토리지 활용 (NCCL 설치 권장)
+#### Method 2: Utilize FSx Shared Storage (Recommended for NCCL Installation)
 
-FSx Lustre에 한 번만 설치하고 모든 ComputeNode에서 참조:
+Install NCCL once on the FSx Lustre and reference it from all ComputeNodes:
 
 ```bash
-# 1. HeadNode에 SSH 접속
+# 1. SSH into the HeadNode
 ssh -i your-key.pem ubuntu@<headnode-ip>
 
-# 2. NCCL 설치 스크립트 다운로드 (config/nccl/ 디렉토리에 있음)
-# 또는 S3에서 다운로드
+# 2. Download the NCCL installation script (available in the config/nccl/ directory)
+# or download it from S3
 aws s3 cp s3://my-pcluster-scripts/config/nccl/install-nccl-shared.sh /fsx/nccl/
 chmod +x /fsx/nccl/install-nccl-shared.sh
 
-# 3. FSx에 NCCL 설치 (한 번만, 10-15분 소요)
+# 3. Install NCCL on the FSx (once, takes 10-15 minutes)
 sudo bash /fsx/nccl/install-nccl-shared.sh v2.28.7-1 v1.17.2-aws /fsx
 
-# 설치 완료 후 생성되는 파일:
-# /fsx/nccl/setup-nccl-env.sh  ← 모든 노드에서 source하여 사용
+# Files created after the installation:
+# /fsx/nccl/setup-nccl-env.sh  ← Source this on all nodes to use NCCL
 ```
 
-**ComputeNode 자동 감지**:
-- ✅ 자동으로 `/fsx/nccl/setup-nccl-env.sh` 감지 및 설정
-- ⚠️ **이미 실행 중인 노드**: 수동 적용 필요
+**Automatic Detection on ComputeNodes**:
+- ✅ Automatically detects and sets up `/fsx/nccl/setup-nccl-env.sh`
+- ⚠️ **Nodes Already Running**: Manual application is required
 
 ```bash
-# 이미 실행 중인 ComputeNode에 적용 (클러스터 생성 후 NCCL 설치한 경우)
+# Apply to ComputeNodes already running (if installed NCCL after cluster creation)
 bash /fsx/nccl/apply-nccl-to-running-nodes.sh
 
-# 또는 수동으로 모든 노드에 적용
+# Or manually apply to all nodes
 srun --nodes=ALL bash -c 'cat > /etc/profile.d/nccl-shared.sh << "EOF"
 source /fsx/nccl/setup-nccl-env.sh
 EOF
 chmod +x /etc/profile.d/nccl-shared.sh'
 
-# 적용 확인
+# Verify the application
 srun --nodes=ALL bash -c 'source /etc/profile.d/nccl-shared.sh && echo "NCCL: $LD_LIBRARY_PATH"'
 ```
 
-**권장 워크플로우**:
-1. 클러스터 생성 (ComputeNode MinCount=0으로 설정)
-2. HeadNode에서 NCCL을 FSx에 설치
-3. Slurm job 제출 → ComputeNode 자동 시작 → NCCL 자동 감지 ✅
+**Recommended Workflow**:
+1. Create the cluster (set ComputeNode MinCount=0)
+2. Install NCCL on the FSx from the HeadNode
+3. Submit Slurm job → ComputeNodes start automatically → NCCL is detected automatically ✅
 
-**장점**: 
-- 빠른 설치 (10-15분, 한 번만)
-- 스토리지 효율 (모든 노드가 공유)
-- 버전 일관성 보장
-- 새 노드 자동 감지
-- CustomActions 타임아웃 회피
+**Advantages**: 
+- Fast installation (10-15 minutes, one-time)
+- Storage efficiency (shared across all nodes)
+- Ensures version consistency
+- Automatic detection of new nodes
+- Avoids CustomActions timeout
 
-**NCCL 버전 확인**:
+**Verify the NCCL Version**:
 ```bash
-# 설치된 NCCL 버전 확인
+# Check the installed NCCL version
 ls -la /fsx/nccl/
 cat /fsx/nccl/setup-nccl-env.sh
 ```
 
-📖 **상세 NCCL 설치 가이드**: [config/nccl/README.md](config/nccl/README.md)  
-📖 **NCCL 컨테이너 사용**: [config/nccl/README-CONTAINER.md](config/nccl/README-CONTAINER.md)  
-📖 **NCCL 설치 타이밍**: [guide/NCCL-INSTALLATION-TIMING.md](guide/NCCL-INSTALLATION-TIMING.md)
+📖 **Detailed NCCL Installation Guide**: [config/nccl/README.md](config/nccl/README.md)  
+📖 **Using NCCL in Containers**: [config/nccl/README-CONTAINER.md](config/nccl/README-CONTAINER.md)  
+📖 **NCCL Installation Timing**: [guide/NCCL-INSTALLATION-TIMING.md](guide/NCCL-INSTALLATION-TIMING.md)
 
-#### 방법 3: 컨테이너 사용
+#### Method 3: Use Containers
 
-사전 구성된 컨테이너로 소프트웨어 설치 불필요:
+No need to install software, use pre-configured containers:
 
 ```bash
-# Slurm job에서 컨테이너 실행
+# Run container in Slurm job
 srun --container-image=nvcr.io/nvidia/pytorch:24.01-py3 \
      --container-mounts=/fsx:/fsx \
      python /fsx/train.py
 ```
 
-**장점**: 설치 불필요, 재현 가능, 버전 관리 용이
+**Advantages**: No installation required, reproducible, easy version management
 
-### Bootstrap 타임아웃 설정
+### Bootstrap Timeout Configuration
 
-ParallelCluster는 노드 초기화 시 CloudFormation WaitCondition을 사용하며, 기본 타임아웃은 30분입니다. GPU 인스턴스(특히 p5en.48xlarge)는 EFA 드라이버와 NVIDIA 소프트웨어 설치에 시간이 더 걸리므로 사전 테스트 후 타임아웃을 늘리시길 바랍니다.
+ParallelCluster uses CloudFormation WaitCondition for node initialization, with a default timeout of 30 minutes. GPU instances (especially p5en.48xlarge) may take longer to install the EFA driver and NVIDIA software, so it's recommended to increase the timeout based on pre-testing.
 
-**현재 설정** (`cluster-config.yaml`):
+**Current Configuration** (`cluster-config.yaml`):
 
 ```yaml
 DevSettings:
   Timeouts:
-    HeadNodeBootstrapTimeout: 3600      # 60분
-    ComputeNodeBootstrapTimeout: 2400   # 40분
+    HeadNodeBootstrapTimeout: 3600      # 60 minutes
+    ComputeNodeBootstrapTimeout: 2400   # 40 minutes
 ```
 
-**타임아웃 근거**:
+**Timeout Rationale**:
 
-| 노드 타입 | 실제 설치 시간 | 타임아웃 설정 | 안전 마진 |
-|-----------|----------------|---------------|-----------|
-| **HeadNode** | ~5분 | 60분 | 12× |
-| **ComputeNode** | 15-20분 | 40분 | 2× |
+| Node Type | Actual Installation Time | Timeout Setting | Safety Margin |
+|-----------|----------------|---------------|---------------|
+| **HeadNode** | ~5 minutes | 60 minutes | 12× |
+| **ComputeNode** | 15-20 minutes | 40 minutes | 2× |
 
-**ComputeNode 설치 시간 상세**:
+**ComputeNode Installation Time Details**:
 
 ```
-EFA Driver:              5-10분  ← 가장 오래 걸림
-Docker + NVIDIA Toolkit:  3분
-Pyxis:                    2분
-CloudWatch Agent:         1분
-DCGM Exporter:            1분
-Node Exporter:            1분
-NCCL 설정:                5초
+EFA Driver:              5-10 minutes  ← Takes the longest
+Docker + NVIDIA Toolkit:  3 minutes
+Pyxis:                    2 minutes
+CloudWatch Agent:         1 minute
+DCGM Exporter:            1 minute
+Node Exporter:            1 minute
+NCCL Setup:               5 seconds
 ─────────────────────────────
-총 실제 시간:            15-20분
-타임아웃 설정:            40분
-안전 마진:               20분
+Total Actual Time:       15-20 minutes
+Timeout Setting:         40 minutes
+Safety Margin:           20 minutes
 ```
 
-**타임아웃 증상**:
-- ComputeNode가 `running` 상태에서 곧바로 `shutting-down`으로 전환
-- CloudWatch 로그에서 설치가 중간에 중단됨
-- CloudFormation 이벤트에 "timeout" 메시지
+**Symptoms of Timeout**:
+- ComputeNode goes from `running` to `shutting-down` immediately
+- Installation is interrupted in the CloudWatch logs
+- CloudFormation event with "timeout" message
 
-**타임아웃 조정이 필요한 경우**:
-- ✅ 느린 네트워크 환경
-- ✅ 대형 인스턴스 타입 (더 많은 드라이버 설치)
-- ✅ 복잡한 CustomActions 스크립트
-- ✅ 추가 소프트웨어 설치
+**When Timeout Adjustment is Needed**:
+- ✅ Slow network environment
+- ✅ Large instance types (more drivers to install)
+- ✅ Complex CustomActions scripts
+- ✅ Additional software installations
 
-**타임아웃 모니터링**:
+**Monitoring Timeouts**:
 
 ```bash
-# CloudFormation 이벤트 확인
+# Check CloudFormation events for timeouts
 aws cloudformation describe-stack-events \
   --stack-name p5en-48xlarge-cluster \
   --region us-east-2 \
   --query 'StackEvents[?contains(ResourceStatusReason, `timeout`)]'
 
-# 인스턴스 상태 확인
+# Check instance states
 aws ec2 describe-instances \
   --filters "Name=tag:aws:cloudformation:stack-name,Values=p5en-48xlarge-cluster" \
   --region us-east-2 \
   --query 'Reservations[*].Instances[*].{ID:InstanceId,State:State.Name,LaunchTime:LaunchTime}'
 
-# CloudWatch 로그 확인
+# Check CloudWatch logs
 aws logs tail /aws/parallelcluster/p5en-48xlarge-cluster --region us-east-2 --since 1h
 ```
 
-📖 **타임아웃 상세 가이드**: [guide/TIMEOUT-CONFIGURATION.md](guide/TIMEOUT-CONFIGURATION.md)
+📖 **Detailed Timeout Configuration Guide**: [guide/TIMEOUT-CONFIGURATION.md](guide/TIMEOUT-CONFIGURATION.md)
 
-### 6. 모니터링 접근
+### 6. Accessing Monitoring
 
-#### Option 1: Amazon Managed Grafana (권장)
+#### Option 1: Amazon Managed Grafana (Recommended)
 
 ```bash
-# Grafana 접속 정보 확인 (amp+amg 옵션 사용 시)
+# Check Grafana access information (when using amp+amg option)
 aws cloudformation describe-stacks \
   --stack-name parallelcluster-infra \
   --query 'Stacks[0].Outputs[?OutputKey==`GrafanaAccessInstructions`].OutputValue' \
   --output text
 
-# 또는 URL만 확인
+# Or just get the URL
 GRAFANA_URL=$(aws cloudformation describe-stacks \
   --stack-name parallelcluster-infra \
   --query 'Stacks[0].Outputs[?OutputKey==`ManagedGrafanaWorkspaceEndpoint`].OutputValue' \
   --output text)
 
 echo "Grafana: https://${GRAFANA_URL}"
-# AWS SSO로 로그인 (권한 부여 후)
+# Log in with AWS SSO (after granting permissions)
 ```
+
 
 #### Option 2: Self-hosting (ALB)
 
 ```bash
-# ALB DNS 확인
+# Check the ALB DNS
 aws cloudformation describe-stacks \
   --stack-name parallelcluster-infra \
   --query 'Stacks[0].Outputs[?OutputKey==`ALBDNSName`].OutputValue' \
   --output text
 
-# 접속: https://<ALB-DNS>/grafana/
-# 기본 로그인: admin / Grafana4PC!
+# Access: https://<ALB-DNS>/grafana/
+# Default login: admin / Grafana4PC!
 ```
 
-### 7. NCCL 성능 테스트
+### 7. NCCL Performance Testing
 
 ```bash
-# NCCL 테스트 설치 (FSx 공유 스토리지에)
+# Install the NCCL tests (on the FSx shared storage)
 bash /fsx/nccl/install-nccl-tests.sh
 
-# 단계별 벤치마크 실행
-# Phase 1: 단일 노드 기본 성능
+# Run the step-by-step benchmarks
+# Phase 1: Single-node baseline
 sbatch /fsx/nccl/phase1-baseline.sbatch
 
-# Phase 2: 멀티 노드 확장성
+# Phase 2: Multi-node scalability
 sbatch /fsx/nccl/phase2-multinode.sbatch
 
-# Phase 3: 실제 워크로드 시뮬레이션
+# Phase 3: Simulate real workload
 sbatch /fsx/nccl/phase3-workload.sbatch
 
-# Phase 4: 최적화된 설정
+# Phase 4: Optimized configuration
 sbatch /fsx/nccl/phase4-optimization.sbatch
 
-# 작업 상태 확인
+# Check job status
 squeue
 
-# 결과 확인
+# Review the results
 ls -lh /fsx/nccl-tests/results/
 ```
 
-**컨테이너 기반 테스트**:
+**Container-based Testing**:
 ```bash
-# NVIDIA PyTorch 컨테이너로 테스트
+# Test using the NVIDIA PyTorch container
 sbatch /fsx/nccl/phase1-baseline-container.sbatch
 sbatch /fsx/nccl/phase3-workload-container.sbatch
 sbatch /fsx/nccl/phase4-optimization-container.sbatch
 ```
 
-📖 **NCCL 성능 테스트 완전 가이드**: [guide/NCCL-PERFORMANCE-TESTING.md](guide/NCCL-PERFORMANCE-TESTING.md)  
-📖 **NCCL 설치 가이드**: [config/nccl/README.md](config/nccl/README.md)
+📖 **Complete NCCL Performance Testing Guide**: [guide/NCCL-PERFORMANCE-TESTING.md](guide/NCCL-PERFORMANCE-TESTING.md)  
+📖 **NCCL Installation Guide**: [config/nccl/README.md](config/nccl/README.md)
 
 ## 📡 Monitoring
 
-### 클러스터 상태 모니터링
+### Monitoring Cluster Status
 
-클러스터 생성 및 운영 중 상태를 확인하고 문제를 해결하는 방법입니다.
+Ways to check the status of the cluster during creation and operation, and troubleshoot issues.
 
-#### 기본 상태 확인
+#### Basic Status Check
 
 ```bash
-# 클러스터 전체 상태
+# Check the overall cluster status
 pcluster describe-cluster --cluster-name my-cluster
 
-# 주요 상태 값:
-# - CREATE_IN_PROGRESS: 생성 중
-# - CREATE_COMPLETE: 생성 완료
-# - CREATE_FAILED: 생성 실패
-# - UPDATE_IN_PROGRESS: 업데이트 중
-# - UPDATE_COMPLETE: 업데이트 완료
+# Key status values:
+# - CREATE_IN_PROGRESS: Creation in progress
+# - CREATE_COMPLETE: Creation completed
+# - CREATE_FAILED: Creation failed
+# - UPDATE_IN_PROGRESS: Update in progress
+# - UPDATE_COMPLETE: Update completed
 ```
 
-#### 실시간 로그 확인
+#### Real-time Log Viewing
 
 ```bash
-# CloudWatch 로그 스트림 확인 (실시간)
+# View CloudWatch log stream in real-time
 pcluster get-cluster-log-events \
   --cluster-name my-cluster \
   --log-stream-name cfn-init
 
-# 최근 1시간 로그
+# View logs from the last 1 hour
 pcluster get-cluster-log-events \
   --cluster-name my-cluster \
   --log-stream-name cfn-init \
   --start-time $(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%S.000Z')
 
-# 특정 노드 로그 확인
+# View logs for a specific node
 pcluster get-cluster-log-events \
   --cluster-name my-cluster \
-  --log-stream-name ip-10-0-16-123.cfn-init  # 노드 IP 기반
+  --log-stream-name ip-10-0-16-123.cfn-init  # Based on node IP
 ```
 
-#### 로그 전체 내보내기
+#### Export All Logs
 
-문제 해결 시 유용한 전체 로그 다운로드:
+Useful for downloading the full set of logs for troubleshooting:
 
 ```bash
-# 모든 로그를 로컬로 다운로드
+# Download all logs locally
 pcluster export-cluster-logs \
   --cluster-name my-cluster \
   --output-file my-cluster-logs.tar.gz
 
-# 압축 해제 및 확인
+# Unpack and inspect
 tar -xzf my-cluster-logs.tar.gz
 ls -la my-cluster-logs/
 
-# 로그 구조:
+# Log structure:
 # my-cluster-logs/
-# ├── cfn-init.log           # CloudFormation 초기화
-# ├── cloud-init.log         # 인스턴스 부팅
-# ├── clustermgtd.log        # 클러스터 관리 데몬
-# ├── slurm_resume.log       # Slurm 노드 시작
-# ├── slurm_suspend.log      # Slurm 노드 중지
-# └── compute/               # ComputeNode 로그
+# ├── cfn-init.log           # CloudFormation initialization
+# ├── cloud-init.log         # Instance boot
+# ├── clustermgtd.log        # Cluster management daemon
+# ├── slurm_resume.log       # Slurm node start
+# ├── slurm_suspend.log      # Slurm node stop
+# └── compute/               # ComputeNode logs
 #     └── ip-10-0-16-*.log
 ```
 
-**특정 기간 로그 내보내기**:
+**Export Logs for a Specific Period**:
 ```bash
-# 최근 1시간 로그만
+# Export only the last 1 hour of logs
 pcluster export-cluster-logs \
   --cluster-name my-cluster \
   --output-file recent-logs.tar.gz \
   --start-time $(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%S.000Z')
 
-# 특정 기간 로그
+# Export logs for a specific period
 pcluster export-cluster-logs \
   --cluster-name my-cluster \
   --output-file period-logs.tar.gz \
@@ -615,198 +616,201 @@ pcluster export-cluster-logs \
   --end-time 2024-01-15T12:00:00.000Z
 ```
 
-#### 로그 필터링 및 분석
+#### Filtering and Analyzing Logs
 
 ```bash
-# 에러 메시지 검색
+# Search for error messages
 pcluster get-cluster-log-events \
   --cluster-name my-cluster \
   --log-stream-name cfn-init \
   --query 'events[?contains(message, `ERROR`)]'
 
-# 특정 키워드 검색 (예: NCCL)
+# Search for specific keywords (e.g., NCCL)
 pcluster get-cluster-log-events \
   --cluster-name my-cluster \
   --log-stream-name cfn-init | grep -i nccl
 
-# 타임아웃 관련 로그 확인
+# Check logs related to timeouts
 tar -xzf my-cluster-logs.tar.gz
 grep -r "timeout\|timed out" my-cluster-logs/
 ```
 
-#### 문제 해결 체크리스트
+#### Troubleshooting Checklist
 
 ```bash
-# 1. 클러스터 상태 확인
+# 1. Check the cluster status
 pcluster describe-cluster --cluster-name my-cluster
 
-# 2. CloudFormation 스택 이벤트 확인
+# 2. Inspect CloudFormation stack events
 aws cloudformation describe-stack-events \
   --stack-name my-cluster \
   --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`]'
 
-# 3. 로그 내보내기 및 분석
+# 3. Export and analyze the logs
 pcluster export-cluster-logs \
   --cluster-name my-cluster \
   --output-file debug-logs.tar.gz
 
-# 4. 에러 메시지 검색
+# 4. Search for error messages
 tar -xzf debug-logs.tar.gz
 grep -r "ERROR\|FAILED\|timeout" debug-logs/
 ```
 
-#### 일반적인 생성 실패 원인
+#### Common Reasons for Creation Failures
 
-| 증상 | 원인 | 해결 방법 |
-|------|------|-----------|
-| `CREATE_FAILED` | CustomActions 타임아웃 | `COMPUTE_SETUP_TYPE=""` 설정 후 재생성 |
-| `CREATE_FAILED` | 용량 부족 | 다른 AZ 시도 또는 인스턴스 타입 변경 |
-| `CREATE_FAILED` | IAM 권한 부족 | CloudFormation 스택 이벤트 확인 |
-| ComputeNode 시작 안됨 | Slurm 설정 오류 | `sinfo`, `squeue` 확인 |
-| 느린 생성 속도 | CustomActions 실행 중 | 정상, 로그로 진행 상황 확인 |
+| Symptom | Cause | Resolution |
+|---------|-------|------------|
+| `CREATE_FAILED` | CustomActions timeout | Set `COMPUTE_SETUP_TYPE=""` and retry creation |
+| `CREATE_FAILED` | Capacity constraints | Try a different AZ or change instance type |
+| `CREATE_FAILED` | IAM permission issues | Check CloudFormation stack events |
+| ComputeNodes not starting | Slurm configuration error | Check `sinfo`, `squeue` |
+| Slow creation speed | CustomActions in progress | Normal, check logs for progress |
 
-📖 **로그 내보내기 상세 가이드**: [AWS ParallelCluster 로그 내보내기](https://docs.aws.amazon.com/ko_kr/parallelcluster/latest/ug/pcluster.export-cluster-logs-v3.html)
+📖 **Detailed Log Export Guide**: [Exporting AWS ParallelCluster Logs](https://docs.aws.amazon.com/parallelcluster/latest/ug/pcluster.export-cluster-logs-v3.html)
 
 ---
 
-### 통합 모니터링 스택
 
-이 아키텍처는 GPU, 시스템, 네트워크 성능을 포괄하는 완전한 모니터링 스택을 제공합니다:
+### Integrated Monitoring Stack
 
-| 모니터링 영역 | 도구 | 메트릭 | 포트 |
-|--------------|------|--------|------|
-| **GPU 성능** | DCGM Exporter | GPU 사용률, 메모리, 온도, 전력 | 9400 |
-| **NVLink** | DCGM | GPU 간 통신 대역폭 | - |
-| **EFA 네트워크** | EFA Monitor | 노드 간 네트워크 처리량, 패킷 속도 | - |
-| **시스템** | Node Exporter | CPU, 메모리, 디스크 | 9100 |
-| **Slurm** | Custom Collector | 작업 큐, 노드 상태 | - |
+This architecture provides a complete monitoring stack covering GPU, system, and network performance:
 
-### 자동 설치
+| Monitoring Area | Tool | Metrics | Port |
+|-----------------|------|---------|------|
+| **GPU Performance** | DCGM Exporter | GPU utilization, memory, temperature, power | 9400 |
+| **NVLink** | DCGM | GPU-to-GPU communication bandwidth | - |
+| **EFA Network** | EFA Monitor | Node-to-node network throughput, packet rate | - |
+| **System** | Node Exporter | CPU, memory, disk | 9100 |
+| **Slurm** | Custom Collector | Job queue, node status | - |
 
-모든 모니터링 컴포넌트는 클러스터 생성 시 자동으로 설치됩니다:
+### Automatic Installation
 
-- **HeadNode**: Prometheus (메트릭 수집 및 저장)
+All monitoring components are automatically installed during cluster creation:
+
+- **HeadNode**: Prometheus (metric collection and storage)
 - **ComputeNode (GPU)**: DCGM Exporter + Node Exporter + EFA Monitor
-- **ComputeNode (CPU)**: Node Exporter만 설치
+- **ComputeNode (CPU)**: Node Exporter only
 
-### 모니터링 가이드
+### Monitoring Guides
 
-- [DCGM GPU 모니터링](guide/DCGM-TO-CLOUDWATCH.md) - GPU 메트릭 상세
-- [NVLink 모니터링](guide/NVLINK-MONITORING.md) - GPU 간 통신
-- [EFA 네트워크 모니터링](guide/EFA-MONITORING.md) - 노드 간 네트워크
-- [Prometheus 메트릭](guide/PROMETHEUS-METRICS.md) - 메트릭 쿼리 가이드
-- [AMP + AMG 설정](guide/AMP-AMG-SETUP.md) - AWS 관리형 모니터링
+- [DCGM GPU Monitoring](guide/DCGM-TO-CLOUDWATCH.md) - Detailed GPU metrics
+- [NVLink Monitoring](guide/NVLINK-MONITORING.md) - GPU-to-GPU communication
+- [EFA Network Monitoring](guide/EFA-MONITORING.md) - Node-to-node network
+- [Prometheus Metrics](guide/PROMETHEUS-METRICS.md) - Metric query guide
+- [AMP + AMG Setup](guide/AMP-AMG-SETUP.md) - AWS managed monitoring
 
-### 대시보드 접근
+### Accessing Dashboards
 
 ```bash
-# CloudWatch 대시보드 (자동 생성)
-# - ParallelCluster-<cluster-name>: 기본 대시보드
-# - ParallelCluster-<cluster-name>-Advanced: 고급 메트릭
-# - ParallelCluster-<cluster-name>-EFA: EFA 네트워크
+# CloudWatch Dashboards (auto-generated)
+# - ParallelCluster-<cluster-name>: Default dashboard
+# - ParallelCluster-<cluster-name>-Advanced: Advanced metrics
+# - ParallelCluster-<cluster-name>-EFA: EFA network
 
-# Grafana (self-hosting 또는 AMG)
+# Grafana (self-hosting or AMG)
 # - GPU Performance
 # - NVLink Bandwidth
 # - EFA Network
 # - Slurm Jobs
 ```
 
-## ⚠️ 고려사항
+## ⚠️ Considerations
 
-### Capacity Block과 Placement Group
+### Capacity Block and Placement Group
 
-> **중요**: Capacity Block과 Placement Group은 동시에 사용할 수 없습니다.
+> **Important**: Capacity Block and Placement Group cannot be used together.
 
-**Capacity Block 사용 시**:
-- `cluster-config.yaml`에서 `PlacementGroup.Enabled: false` 설정 필수
-- Single Spine 구성이 필요한 경우 Capacity Block 예약 전 AWS Account Team에 문의
-- 토폴로지 확인: [EC2 Instance Topology](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-topology.html)
+**When using Capacity Block**:
+- Set `PlacementGroup.Enabled: false` in `cluster-config.yaml`
+- For a Single Spine configuration, consult the AWS Account Team before reserving the Capacity Block
+- Check the topology: [EC2 Instance Topology](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-topology.html)
 
-**On-Demand/Spot 사용 시**:
-- Placement Group 활성화 권장 (최적의 네트워크 성능)
+**When using On-Demand/Spot**:
+- Enabling Placement Group is recommended for optimal network performance
 
-### 인스턴스 타입 선택
+### Instance Type Selection
 
-**HeadNode와 LoginNode는 GPU가 필요 없습니다** - 비용 최적화를 위해 CPU 인스턴스 사용을 권장합니다.
+**HeadNode and LoginNode do not require GPU**: It is recommended to use CPU instances for cost optimization.
 
-| 노드 타입 | 권장 인스턴스 | 용도 | 비용 절감 |
-|-----------|---------------|------|-----------|
-| HeadNode | m5.2xlarge ~ m5.8xlarge | Slurm 스케줄러 | ~99% |
-| LoginNode | m5.large ~ m5.2xlarge | 사용자 접근, 전처리 | ~99% |
-| ComputeNode | p5en.48xlarge, p6-b200.48xlarge | GPU 워크로드 | - |
-| Monitoring | t3.medium | 모니터링 전용 | - |
+| Node Type | Recommended Instance | Purpose | Cost Savings |
+|-----------|----------------------|---------|--------------|
+| HeadNode | m5.2xlarge ~ m5.8xlarge | Slurm scheduler | ~99% |
+| LoginNode | m5.large ~ m5.2xlarge | User access, preprocessing | ~99% |
+| ComputeNode | p5en.48xlarge, p6-b200.48xlarge | GPU workloads | - |
+| Monitoring | t3.medium | Monitoring-only | - |
 
-📖 **인스턴스 타입 상세 가이드**: [guide/INSTANCE-TYPE-CONFIGURATION.md](guide/INSTANCE-TYPE-CONFIGURATION.md)
+📖 **Detailed Instance Type Guide**: [guide/INSTANCE-TYPE-CONFIGURATION.md](guide/INSTANCE-TYPE-CONFIGURATION.md)
 
-### 스토리지 구성
+### Storage Configuration
 
-#### 고성능 공유 스토리지
-- **FSx Lustre** (`/fsx`): 데이터셋, 모델, 체크포인트
-  - 멀티 GB/s 처리량
-  - 병렬 I/O 최적화
-  - S3 연동 가능
+#### High-Performance Shared Storage
+- **FSx Lustre** (`/fsx`): Datasets, models, checkpoints
+  - Multi-GB/s throughput
+  - Parallel I/O optimized
+  - S3 integration available
 
-#### Home 디렉토리 공유
+#### Home Directory Sharing
 
-**옵션 1: HeadNode NFS** (`/home`) - 권장
-- 사용자 파일, 스크립트, 환경 설정
-- 추가 비용 없음
-- 설정 간단
-- **대부분의 경우 충분한 성능**
+**Option 1: HeadNode NFS** (`/home`) - Recommended
+- User files, scripts, environment
+- No additional cost
+- Simple setup
+- **Sufficient performance for most cases**
 
-**옵션 2: FSx OpenZFS** (`/home`) - 특수한 경우
-- 고성능 Home 디렉토리가 필요한 경우
-- 많은 사용자 동시 접속 시
-- 추가 비용 발생
-- 설정 복잡
+**Option 2: FSx OpenZFS** (`/home`) - Special cases
+- Require high-performance Home directory
+- Many concurrent users
+- Additional cost
+- Complex setup
 
-> 💡 **권장사항**: 특별한 요구사항이 없다면 HeadNode NFS로 충분합니다. FSx OpenZFS는 다음과 같은 경우에만 고려하세요:
-> - 수십 명 이상의 사용자가 동시에 Home 디렉토리에 집중적으로 I/O 수행
-> - Home 디렉토리에서 높은 IOPS가 필요한 작업 수행
-> - 스냅샷, 복제 등 고급 파일시스템 기능 필요
+> 💡 **Recommendation**: HeadNode NFS is sufficient unless you have specific requirements. Consider FSx OpenZFS only if:
+> - Dozens of users concurrently accessing the Home directory intensively
+> - Require high IOPS in the Home directory
+> - Need advanced file system features like snapshots, replication
 
-#### 로컬 스토리지
-- **EBS**: 루트 볼륨 및 로컬 스크래치
-  - ComputeNode: 200GB+ 권장 (컨테이너 이미지용)
-  - HeadNode: 500GB+ 권장 (로그, 패키지용)
+#### Local Storage
+- **EBS**: Root volume and local scratch
+  - ComputeNode: 200GB+ recommended (for container images)
+  - HeadNode: 500GB+ recommended (for logs, packages)
 
-### WaitCondition 타임아웃 관리
 
-ParallelCluster는 노드 배포 시 CloudFormation WaitCondition을 사용하며, 기본 타임아웃은 30분입니다.
+### WaitCondition Timeout Management
 
-**권장 전략**:
-1. ✅ **클러스터 생성 시**: 최소 설치만 수행 (빠른 배포)
-   - CustomActions는 경량 작업만 (Docker, Pyxis, 모니터링)
-   - NCCL 같은 대용량 설치는 제외
+ParallelCluster uses CloudFormation WaitCondition during node provisioning, with a default timeout of 30 minutes.
 
-2. ✅ **생성 완료 후**: 필요한 소프트웨어 수동 설치
-   - NCCL을 FSx에 설치하여 공유
-   - 또는 컨테이너 이미지 사용
+**Recommended Strategies**:
+1. ✅ **During cluster creation**: Perform minimum installation (faster deployment)
+   - CustomActions should only do lightweight tasks (Docker, Pyxis, monitoring)
+   - Exclude large installations like NCCL
 
-3. ✅ **공유 스토리지 활용**: 한 번 설치하여 모든 노드에서 참조
-   - `/fsx/nccl/` - NCCL 라이브러리
-   - `/fsx/containers/` - 컨테이너 이미지
-   - `/fsx/software/` - 기타 소프트웨어
+2. ✅ **After creation**: Manually install required software
+   - Install NCCL on FSx for sharing
+   - Or use container images
 
-4. ✅ **컨테이너 사용**: 사전 구성된 이미지 활용
-   - NVIDIA NGC 컨테이너 (PyTorch, TensorFlow 등)
-   - 재현성 보장
-   - 설치 시간 제로
+3. ✅ **Leverage shared storage**: Install once and reference across all nodes
+   - `/fsx/nccl/` - NCCL library
+   - `/fsx/containers/` - Container images
+   - `/fsx/software/` - Other software
 
-**다수의 ComputeNode 관리**:
-- ✅ **FSx 공유 스토리지 활용**: NCCL 등을 `/fsx`에 한 번만 설치하여 모든 노드에서 참조
-- ✅ **Slurm job 일괄 적용**: 개별 SSH 접속 대신 `srun --nodes=ALL` 사용
-- ✅ **컨테이너 사용**: Docker/Singularity로 사전 구성된 환경 배포
+4. ✅ **Use containers**: Leverage pre-configured images
+   - NVIDIA NGC containers (PyTorch, TensorFlow, etc.)
+   - Ensures reproducibility
+   - Zero installation time
 
-📖 **타임아웃 상세 가이드**: [guide/TIMEOUT-CONFIGURATION.md](guide/TIMEOUT-CONFIGURATION.md)
+**Managing Multiple ComputeNodes**:
+- ✅ **Use FSx shared storage**: Install NCCL and other software in `/fsx` once for all nodes to access
+- ✅ **Apply Slurm jobs in bulk**: Use `srun --nodes=ALL` instead of individual SSH access
+- ✅ **Utilize containers**: Deploy pre-configured environments using Docker/Singularity
 
-## 📊 예상 성능
 
-### GPU 인스턴스 사양 예시
+📖 **Timeout Detail Guide**: [guide/TIMEOUT-CONFIGURATION.md](guide/TIMEOUT-CONFIGURATION.md)
 
-**p5en.48xlarge** (H100 기반):
-| 항목 | 사양 |
+## 📊 Expected Performance
+
+### GPU Instance Specifications Example
+
+**p5en.48xlarge** (H100 based):
+| Metric | Specification |
 |------|------|
 | vCPUs | 192 |
 | Memory | 2,048 GiB (2TB DDR5) |
@@ -815,8 +819,8 @@ ParallelCluster는 노드 배포 시 CloudFormation WaitCondition을 사용하�
 | NVLink | 900 GB/s per direction |
 | Storage | 8x 3.84TB NVMe SSD |
 
-**p6-b200.48xlarge** (B200 기반):
-| 항목 | 사양 |
+**p6-b200.48xlarge** (B200 based):
+| Metric | Specification |
 |------|------|
 | vCPUs | 192 |
 | Memory | 2,048 GiB (2TB DDR5) |
@@ -825,67 +829,69 @@ ParallelCluster는 노드 배포 시 CloudFormation WaitCondition을 사용하�
 | NVLink | 900 GB/s per direction |
 | Storage | 8x 3.84TB NVMe SSD |
 
-### NCCL 성능 지표
+### NCCL Performance Metrics
 
-**단일 노드 (NVLink)**:
-- AllReduce: 800-1200 GB/s (1GB 메시지)
-- AllToAll: 200-400 GB/s (128MB 메시지)
-- 레이턴시: <100μs (소형 메시지)
+**Single Node (NVLink)**:
+- AllReduce: 800-1200 GB/s (1GB message)
+- AllToAll: 200-400 GB/s (128MB message)
+- Latency: <100μs (small messages)
 
-**멀티 노드 (EFA)**:
-- AllReduce: >90% 확장 효율성
-- 네트워크 활용: >80% of 3.2Tbps
-- 레이턴시 증가: <20μs vs 단일 노드
+**Multi-Node (EFA)**:
+- AllReduce: >90% scaling efficiency
+- Network Utilization: >80% of 3.2Tbps
+- Latency Increase: <20μs vs. single node
 
-📖 **NCCL 성능 테스트**: [guide/NCCL-PERFORMANCE-TESTING.md](guide/NCCL-PERFORMANCE-TESTING.md)
+
+📖 **NCCL Performance Test**: [guide/NCCL-PERFORMANCE-TESTING.md](guide/NCCL-PERFORMANCE-TESTING.md)
 
 ## 🛡️ Security
 
-### 보안 체크리스트
+### Security Checklist
 
-- [ ] SSH 접근을 특정 IP로 제한 (`AllowedIPsForLoginNodeSSH`)
-- [ ] Monitoring Instance는 ALB를 통해서만 접근
-- [ ] Grafana 기본 비밀번호 변경
-- [ ] SSM Session Manager 사용 (SSH 대신)
-- [ ] HeadNode/ComputeNode는 Private Subnet에 배치
+- [ ] Restrict SSH access to specific IPs (`AllowedIPsForLoginNodeSSH`)
+- [ ] Access Monitoring Instance only through ALB
+- [ ] Change Grafana default password
+- [ ] Use SSM Session Manager instead of SSH
+- [ ] Place HeadNode/ComputeNode in Private Subnet
 
-### 안전한 접근 방법
+### Secure Access Methods
 
 ```bash
-# SSM Session Manager (권장)
+# SSM Session Manager (recommended)
 aws ssm start-session --target <Instance-ID>
 
-# Grafana 포트 포워딩
+# Grafana port forwarding
 aws ssm start-session \
   --target <Monitoring-Instance-ID> \
   --document-name AWS-StartPortForwardingSession \
   --parameters '{"portNumber":["3000"],"localPortNumber":["3000"]}'
 ```
 
-📖 **보안 가이드**: [security-best-practices/SECURITY.md](security-best-practices/SECURITY.md)
+📖 **Security Guide**: [security-best-practices/SECURITY.md](security-best-practices/SECURITY.md)
 
 ## 🔍 Troubleshooting
 
-**빠른 문제 해결**:
+**Quick Troubleshooting**:
 
 ```bash
-# 클러스터 상태 확인
+# Check cluster status
 pcluster describe-cluster --cluster-name my-cluster
 
-# 로그 확인
-pcluster get-cluster-log-events --cluster-name my-cluster
+# View logs
+pcluster get-cluster-log-events --cluster-name my-cluster  
 
-# 설정 검증
+# Validate configuration
 pcluster validate-cluster-configuration --cluster-configuration cluster-config.yaml
 ```
 
 ## 📝 Additional Guides
 
-- [빠른 시작 가이드](guide/QUICKSTART-EFA-MONITORING.md) - EFA 모니터링 포함 빠른 설정
-- [클러스터 재생성 가이드](guide/CLUSTER-RECREATION-GUIDE.md) - 클러스터 삭제 및 재생성 절차
-- [CloudWatch 모니터링 완료](guide/CLOUDWATCH-MONITORING-COMPLETE.md) - CloudWatch 통합 설정
-- [선택적 컴포넌트 업데이트](guide/OPTIONAL-COMPONENTS-UPDATE.md) - 추가 기능 설치
-- [변경 이력](guide/CHANGELOG-EFA-MONITORING.md) - EFA 모니터링 업데이트 내역
+- [Quickstart Guide](guide/QUICKSTART-EFA-MONITORING.md) - Quick Setup with EFA Monitoring
+- [Cluster Recreation Guide](guide/CLUSTER-RECREATION-GUIDE.md) - Procedure for Deleting and Recreating Clusters
+- [Complete CloudWatch Monitoring](guide/CLOUDWATCH-MONITORING-COMPLETE.md) - CloudWatch Integration Setup
+- [Optional Components Update](guide/OPTIONAL-COMPONENTS-UPDATE.md) - Installing Additional Features
+- [Changelog - EFA Monitoring](guide/CHANGELOG-EFA-MONITORING.md) - Updates to EFA Monitoring
+
 
 ## 📚 Additional Resources
 
