@@ -1,100 +1,100 @@
-# ParallelCluster 가이드 문서
+# ParallelCluster Guide Documentation
 
-이 디렉토리에는 AWS ParallelCluster 설정 및 운영에 대한 상세 가이드가 포함되어 있습니다.
+This directory contains detailed guides for configuring and operating AWS ParallelCluster.
 
-## 📚 문서 목록
+## 📚 List of Documents
 
-### 설치 및 설정
+### Installation and Configuration
 
-- **[INSTANCE-TYPE-CONFIGURATION.md](INSTANCE-TYPE-CONFIGURATION.md)** ⭐ NEW
-  - 인스턴스 타입별 설정 가이드
-  - GPU+EFA, GPU Only, Non-GPU 인스턴스 설정
-  - EFA/DCGM/Node Exporter 선택적 설치
-  - 인스턴스 타입별 권장 설정
+- **[INSTANCE-TYPE-CONFIGURATION.md](INSTANCE-TYPE-CONFIGURATION.md) ⭐ NEW**
+  - Guide for instance type-specific configuration
+  - Settings for GPU+EFA, GPU-Only, and Non-GPU instances
+  - Selective installation of EFA, DCGM, and Node Exporter
+  - Recommended settings for each instance type
 
 - **[TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md)**
-  - ComputeNode 부트스트랩 타임아웃 설정
-  - 타임아웃 문제 해결
-  - 권장 타임아웃 값 및 근거
+  - ComputeNode bootstrap timeout configuration
+  - Troubleshooting timeout issues
+  - Recommended timeout values and rationale
 
 - **[TESTING-MINIMAL-CLUSTER.md](TESTING-MINIMAL-CLUSTER.md)**
-  - 최소 구성 클러스터 테스트 가이드
-  - CustomActions 비활성화 테스트
-  - 문제 원인 파악 방법
+  - Guide for testing a minimal cluster configuration
+  - Testing with CustomActions disabled
+  - Identifying root causes of issues
 
-### 모니터링 및 디버깅
+### Monitoring and Debugging
 
 - **[MONITORING-SETUP-PROGRESS.md](MONITORING-SETUP-PROGRESS.md)**
-  - ComputeNode 설치 진행 상황 모니터링
-  - CloudWatch Logs 확인 방법
-  - 설치 단계별 로그 메시지
-  - 문제 해결 체크리스트
+  - Monitoring ComputeNode installation progress
+  - Checking CloudWatch Logs
+  - Log messages for each installation step
+  - Troubleshooting checklist
 
-### 성능 및 최적화
+### Performance and Optimization
 
 - **[NCCL-INSTALLATION-TIMING.md](NCCL-INSTALLATION-TIMING.md)**
-  - NCCL 설치 시간 분석
-  - 컴포넌트별 소요 시간
-  - NGC 컨테이너 vs 수동 설치 비교
+  - Analysis of NCCL installation time
+  - Time breakdown by component
+  - Comparison of NGC container vs. manual installation
 
-## 🔗 관련 문서
+## 🔗 Related Documents
 
-### 메인 문서
-- [../README.md](../README.md) - 프로젝트 개요 및 Quick Start
+### Main Documentation
+- [../README.md](../README.md) - Project overview and Quick Start
 
-### 설정 파일
-- [../cluster-config.yaml.template](../cluster-config.yaml.template) - 클러스터 설정 템플릿
-- [../environment-variables.sh](../environment-variables.sh) - 환경 변수 설정
+### Configuration Files
+- [../cluster-config.yaml.template](../cluster-config.yaml.template) - Cluster configuration template
+- [../environment-variables.sh](../environment-variables.sh) - Environment variables setup
 
-### 스크립트
-- [../scripts/monitor-compute-node-setup.sh](../scripts/monitor-compute-node-setup.sh) - 설치 모니터링 스크립트
-- [../scripts/check-compute-setup.sh](../scripts/check-compute-setup.sh) - 설치 상태 확인 스크립트
+### Scripts
+- [../scripts/monitor-compute-node-setup.sh](../scripts/monitor-compute-node-setup.sh) - Installation monitoring script
+- [../scripts/check-compute-setup.sh](../scripts/check-compute-setup.sh) - Installation status check script
 
-### 설정 디렉토리
-- [../config/headnode/README.md](../config/headnode/README.md) - HeadNode 설정 가이드
-- [../config/nccl/README.md](../config/nccl/README.md) - NCCL 설치 및 테스트
+### Configuration Directories
+- [../config/headnode/README.md](../config/headnode/README.md) - HeadNode configuration guide
+- [../config/nccl/README.md](../config/nccl/README.md) - NCCL installation and testing
 
-## 📖 문서 사용 가이드
+## 📖 How to Use the Documentation
 
-### 클러스터 생성 전
-1. [INSTANCE-TYPE-CONFIGURATION.md](INSTANCE-TYPE-CONFIGURATION.md) - 인스턴스 타입별 설정 ⭐
-2. [TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md) - 타임아웃 설정 확인
-3. [TESTING-MINIMAL-CLUSTER.md](TESTING-MINIMAL-CLUSTER.md) - 테스트 전략 수립
+### Before Cluster Creation
+1. [INSTANCE-TYPE-CONFIGURATION.md](INSTANCE-TYPE-CONFIGURATION.md) - Instance type-specific configuration ⭐
+2. [TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md) - Review timeout configuration
+3. [TESTING-MINIMAL-CLUSTER.md](TESTING-MINIMAL-CLUSTER.md) - Develop a testing strategy
 
-### 클러스터 생성 중
-1. [MONITORING-SETUP-PROGRESS.md](MONITORING-SETUP-PROGRESS.md) - 실시간 모니터링
+### During Cluster Creation
+1. [MONITORING-SETUP-PROGRESS.md](MONITORING-SETUP-PROGRESS.md) - Real-time monitoring
 
-### 문제 발생 시
-1. [MONITORING-SETUP-PROGRESS.md](MONITORING-SETUP-PROGRESS.md) - 로그 확인
-2. [TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md) - 타임아웃 문제 해결
-3. [TESTING-MINIMAL-CLUSTER.md](TESTING-MINIMAL-CLUSTER.md) - 최소 구성 테스트
+### When Issues Occur
+1. [MONITORING-SETUP-PROGRESS.md](MONITORING-SETUP-PROGRESS.md) - Check logs
+2. [TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md) - Troubleshoot timeout issues
+3. [TESTING-MINIMAL-CLUSTER.md](TESTING-MINIMAL-CLUSTER.md) - Test the minimal configuration
 
-### NCCL 설치 시
-1. [NCCL-INSTALLATION-TIMING.md](NCCL-INSTALLATION-TIMING.md) - 설치 시간 예상
-2. [../config/nccl/README.md](../config/nccl/README.md) - 설치 방법
+### When Installing NCCL
+1. [NCCL-INSTALLATION-TIMING.md](NCCL-INSTALLATION-TIMING.md) - Estimate installation time
+2. [../config/nccl/README.md](../config/nccl/README.md) - Installation methods
 
-## 💡 빠른 참조
+## 💡 Quick References
 
-### 타임아웃 설정
+### Timeout Configuration
 ```yaml
 DevSettings:
   Timeouts:
-    HeadNodeBootstrapTimeout: 3600      # 60분
-    ComputeNodeBootstrapTimeout: 2400   # 40분
+    HeadNodeBootstrapTimeout: 3600      # 60 minutes
+    ComputeNodeBootstrapTimeout: 2400   # 40 minutes
 ```
 
-### 설치 모니터링
+### Monitoring Installation
 ```bash
 bash scripts/monitor-compute-node-setup.sh <cluster-name> <region>
 ```
 
-### 최소 구성 테스트
+### Testing Minimal Configuration
 ```bash
 # environment-variables.sh
 export ENABLE_COMPUTE_SETUP="false"
 ```
 
-### 설치 상태 확인
+### Checking Installation Status
 ```bash
 srun --nodes=1 bash /fsx/scripts/check-compute-setup.sh
 ```
