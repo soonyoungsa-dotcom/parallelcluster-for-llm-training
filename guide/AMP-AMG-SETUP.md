@@ -1,60 +1,60 @@
-# AMP + AMG 자동 연결 가이드
+# AMP + AMG Automatic Connection Guide
 
-AWS Managed Prometheus (AMP)와 AWS Managed Grafana (AMG)를 사용한 완전 관리형 모니터링 설정 가이드입니다.
+This is a guide for setting up a fully managed monitoring solution using AWS Managed Prometheus (AMP) and AWS Managed Grafana (AMG).
 
-## 📋 목차
+## 📋 Table of Contents
 
-- [자동으로 수행되는 작업](#자동으로-수행되는-작업)
-- [수동으로 수행해야 하는 작업](#수동으로-수행해야-하는-작업)
-- [전체 설정 프로세스](#전체-설정-프로세스)
-- [Grafana 접근 방법](#grafana-접근-방법)
-- [트러블슈팅](#트러블슈팅)
+- [Automated Tasks](#automated-tasks)
+- [Manual Tasks](#manual-tasks)
+- [Full Setup Process](#full-setup-process)
+- [Accessing Grafana](#accessing-grafana)
+- [Troubleshooting](#troubleshooting)
 
-## ✅ 자동으로 수행되는 작업
+## ✅ Automated Tasks
 
-Infrastructure 스택 배포 시 자동으로 수행됩니다:
+The following tasks are automatically performed during Infrastructure stack deployment:
 
-### 1. AMP Workspace 생성
-- ✅ Prometheus 워크스페이스 자동 생성
-- ✅ Remote write endpoint 설정
-- ✅ IAM 정책 자동 생성 (remote_write, query)
+### 1. AMP Workspace Creation
+- ✅ Prometheus workspace is automatically created
+- ✅ Remote write endpoint is configured
+- ✅ IAM policies are automatically created (remote_write, query)
 
-### 2. AMG Workspace 생성
-- ✅ Grafana 워크스페이스 자동 생성
-- ✅ AWS SSO 인증 설정
-- ✅ IAM 역할 자동 생성
+### 2. AMG Workspace Creation
+- ✅ Grafana workspace is automatically created
+- ✅ AWS SSO authentication is set up
+- ✅ IAM role is automatically created
 
-### 3. AMP ↔ AMG 자동 연결
-- ✅ Lambda 함수가 자동으로 AMP 데이터소스를 Grafana에 추가
-- ✅ SigV4 인증 자동 설정
-- ✅ 기본 데이터소스로 설정
+### 3. AMP ↔ AMG Automatic Connection
+- ✅ Lambda function automatically adds the AMP data source to Grafana
+- ✅ SigV4 authentication is automatically set up
+- ✅ Set as the default data source
 
-### 4. ParallelCluster 통합
-- ✅ HeadNode Prometheus가 AMP로 메트릭 전송
-- ✅ IAM 정책 자동 연결
+### 4. ParallelCluster Integration
+- ✅ HeadNode Prometheus sends metrics to AMP
+- ✅ IAM policy is automatically attached
 
-## 🔧 수동으로 수행해야 하는 작업
+## 🔧 Manual Tasks
 
-### 1. AWS IAM Identity Center (SSO) 설정
+### 1. Configure AWS IAM Identity Center (SSO)
 
-**필수 사전 조건**: AWS IAM Identity Center가 활성화되어 있어야 합니다.
+**Prerequisite**: AWS IAM Identity Center must be enabled.
 
 ```bash
-# Identity Center 활성화 확인
+# Check if Identity Center is enabled
 aws sso-admin list-instances --region us-east-2
 ```
 
-**활성화되지 않은 경우:**
-1. AWS Console → IAM Identity Center
-2. "Enable" 클릭
-3. 조직 이메일 설정
+**If not enabled:**
+1. Go to AWS Console → IAM Identity Center
+2. Click "Enable"
+3. Set up your organization's email
 
-### 2. Grafana 사용자 추가
+### 2. Add Grafana Users
 
-Infrastructure 스택 배포 후:
+After deploying the Infrastructure stack:
 
 ```bash
-# 1. Grafana Workspace ID 가져오기
+# 1. Get the Grafana Workspace ID
 GRAFANA_WORKSPACE_ID=$(aws cloudformation describe-stacks \
     --stack-name pcluster-infra \
     --region us-east-2 \
@@ -63,7 +63,7 @@ GRAFANA_WORKSPACE_ID=$(aws cloudformation describe-stacks \
 
 echo "Grafana Workspace ID: ${GRAFANA_WORKSPACE_ID}"
 
-# 2. 사용자에게 ADMIN 권한 부여
+# 2. Grant ADMIN permissions to a user
 aws grafana update-permissions \
     --workspace-id ${GRAFANA_WORKSPACE_ID} \
     --region us-east-2 \
@@ -81,15 +81,15 @@ aws grafana update-permissions \
     ]'
 ```
 
-**역할 옵션:**
-- `ADMIN`: 모든 권한 (대시보드 생성/수정/삭제)
-- `EDITOR`: 대시보드 생성/수정
-- `VIEWER`: 읽기 전용
+**Role options:**
+- `ADMIN`: Full permissions (create/modify/delete dashboards)
+- `EDITOR`: Create/modify dashboards
+- `VIEWER`: Read-only
 
-### 3. 여러 사용자 추가
+### 3. Add Multiple Users
 
 ```bash
-# 여러 사용자 한 번에 추가
+# Add multiple users at once
 aws grafana update-permissions \
     --workspace-id ${GRAFANA_WORKSPACE_ID} \
     --region us-east-2 \
@@ -119,12 +119,12 @@ aws grafana update-permissions \
     ]'
 ```
 
-## 🚀 전체 설정 프로세스
+## 🚀 Full Setup Process
 
-### 1단계: Infrastructure 스택 배포
+### Step 1: Deploy the Infrastructure Stack
 
 ```bash
-# MonitoringType을 amp+amg로 설정
+# Set MonitoringType to amp+amg
 aws cloudformation create-stack \
     --stack-name pcluster-infra \
     --template-body file://parallelcluster-infrastructure.yaml \
@@ -136,15 +136,15 @@ aws cloudformation create-stack \
     --region us-east-2
 ```
 
-**자동으로 수행되는 작업:**
-- AMP Workspace 생성 (~1분)
-- AMG Workspace 생성 (~5분)
-- Lambda 함수가 AMP 데이터소스를 Grafana에 추가 (~1분)
+**Automated Tasks:**
+- AMP Workspace creation (~1 minute)
+- AMG Workspace creation (~5 minutes)
+- Lambda function adds AMP data source to Grafana (~1 minute)
 
-### 2단계: 스택 완료 대기
+### Step 2: Wait for Stack Completion
 
 ```bash
-# 스택 생성 완료 대기 (약 5-10분)
+# Wait for stack creation to complete (around 5-10 minutes)
 aws cloudformation wait stack-create-complete \
     --stack-name pcluster-infra \
     --region us-east-2
@@ -152,10 +152,10 @@ aws cloudformation wait stack-create-complete \
 echo "✓ Infrastructure stack created successfully"
 ```
 
-### 3단계: Grafana 접근 정보 확인
+### Step 3: Retrieve Grafana Access Information
 
 ```bash
-# Grafana URL 가져오기
+# Get the Grafana URL
 GRAFANA_URL=$(aws cloudformation describe-stacks \
     --stack-name pcluster-infra \
     --region us-east-2 \
@@ -164,7 +164,7 @@ GRAFANA_URL=$(aws cloudformation describe-stacks \
 
 echo "Grafana URL: https://${GRAFANA_URL}"
 
-# Workspace ID 가져오기
+# Get the Workspace ID
 GRAFANA_WORKSPACE_ID=$(aws cloudformation describe-stacks \
     --stack-name pcluster-infra \
     --region us-east-2 \
@@ -174,10 +174,10 @@ GRAFANA_WORKSPACE_ID=$(aws cloudformation describe-stacks \
 echo "Workspace ID: ${GRAFANA_WORKSPACE_ID}"
 ```
 
-### 4단계: 사용자 추가 (수동)
+### Step 4: Add Users (Manual)
 
 ```bash
-# 자신의 이메일로 ADMIN 권한 추가
+# Add yourself as an ADMIN
 aws grafana update-permissions \
     --workspace-id ${GRAFANA_WORKSPACE_ID} \
     --region us-east-2 \
@@ -197,30 +197,30 @@ aws grafana update-permissions \
 echo "✓ User added to Grafana workspace"
 ```
 
-### 5단계: ParallelCluster 생성
+### Step 5: Create ParallelCluster
 
 ```bash
-# environment-variables-bailey.sh에서 CLUSTER_NAME 확인
+# Check CLUSTER_NAME in environment-variables-bailey.sh
 source environment-variables-bailey.sh
 
-# 클러스터 생성
+# Create the cluster
 pcluster create-cluster \
     --cluster-name ${CLUSTER_NAME} \
     --cluster-configuration cluster-config.yaml \
     --region ${AWS_REGION}
 ```
 
-**자동으로 수행되는 작업:**
-- HeadNode Prometheus가 AMP로 메트릭 전송
-- ComputeNode DCGM/Node Exporter가 HeadNode Prometheus로 메트릭 전송
-- Prometheus가 AMP로 remote_write
+**Automated Tasks:**
+- HeadNode Prometheus sends metrics to AMP
+- ComputeNode DCGM/Node Exporter sends metrics to HeadNode Prometheus
+- Prometheus sends remote_write to AMP
 
-## 🌐 Grafana 접근 방법
+## 🌐 Accessing Grafana
 
-### 1. Grafana URL 접속
+### 1. Access the Grafana URL
 
 ```bash
-# URL 확인
+# Get the URL
 aws cloudformation describe-stacks \
     --stack-name pcluster-infra \
     --region us-east-2 \
@@ -228,83 +228,83 @@ aws cloudformation describe-stacks \
     --output text
 ```
 
-브라우저에서 `https://<workspace-id>.grafana-workspace.us-east-2.amazonaws.com` 접속
+Open the URL `https://<workspace-id>.grafana-workspace.us-east-2.amazonaws.com` in your browser.
 
-### 2. AWS SSO 로그인
+### 2. Sign in with AWS SSO
 
-1. "Sign in with AWS SSO" 클릭
-2. Identity Center 이메일/비밀번호 입력
-3. MFA 인증 (설정된 경우)
+1. Click "Sign in with AWS SSO"
+2. Enter your Identity Center email/password
+3. Perform MFA (if configured)
 
-### 3. AMP 데이터소스 확인
+### 3. Verify the AMP Data Source
 
-Grafana 접속 후:
-1. 좌측 메뉴 → Configuration → Data sources
-2. "Amazon Managed Prometheus" 확인
-3. "Default" 태그 확인
+After logging into Grafana:
+1. Go to the left menu → Configuration → Data sources
+2. Verify the "Amazon Managed Prometheus" data source
+3. Ensure the "Default" tag is set
 
-### 4. 대시보드 생성
+### 4. Create a Dashboard
 
 ```
-1. 좌측 메뉴 → Create → Dashboard
-2. Add panel
-3. Query: 메트릭 선택 (예: up, node_cpu_seconds_total)
-4. Data source: Amazon Managed Prometheus (자동 선택됨)
-5. Save dashboard
+1. Go to the left menu → Create → Dashboard
+2. Add a panel
+3. Query: Select a metric (e.g., up, node_cpu_seconds_total)
+4. Data source: Amazon Managed Prometheus (automatically selected)
+5. Save the dashboard
 ```
 
-## 📊 사전 구성된 메트릭
+## 📊 Pre-Configured Metrics
 
-AMP에 자동으로 수집되는 메트릭:
+Metrics automatically collected in AMP:
 
-### DCGM (GPU 메트릭)
-- `DCGM_FI_DEV_GPU_UTIL` - GPU 사용률
-- `DCGM_FI_DEV_MEM_COPY_UTIL` - GPU 메모리 사용률
-- `DCGM_FI_DEV_GPU_TEMP` - GPU 온도
-- `DCGM_FI_DEV_POWER_USAGE` - GPU 전력 소비
+### DCGM (GPU Metrics)
+- `DCGM_FI_DEV_GPU_UTIL` - GPU utilization
+- `DCGM_FI_DEV_MEM_COPY_UTIL` - GPU memory utilization
+- `DCGM_FI_DEV_GPU_TEMP` - GPU temperature
+- `DCGM_FI_DEV_POWER_USAGE` - GPU power usage
 
-### Node Exporter (시스템 메트릭)
-- `node_cpu_seconds_total` - CPU 사용 시간
-- `node_memory_MemAvailable_bytes` - 사용 가능한 메모리
-- `node_disk_io_time_seconds_total` - 디스크 I/O
-- `node_network_receive_bytes_total` - 네트워크 수신
+### Node Exporter (System Metrics)
+- `node_cpu_seconds_total` - CPU usage time
+- `node_memory_MemAvailable_bytes` - Available memory
+- `node_disk_io_time_seconds_total` - Disk I/O
+- `node_network_receive_bytes_total` - Network receive
 
-### Slurm 메트릭 (CloudWatch에서 수집)
-- CloudWatch에서 확인 가능
-- Grafana CloudWatch 데이터소스로 조회 가능
+### Slurm Metrics (Collected from CloudWatch)
+- Available in CloudWatch
+- Can be queried in Grafana using the CloudWatch data source
 
-## 🛠️ 트러블슈팅
+## 🛠️ Troubleshooting
 
-### 문제: Grafana에 접근할 수 없음
+### Issue: Unable to access Grafana
 
-**원인**: 사용자가 Grafana workspace에 추가되지 않음
+**Cause**: User is not added to the Grafana workspace
 
-**해결:**
+**Solution:**
 ```bash
-# 사용자 목록 확인
+# Check the list of users
 aws grafana list-permissions \
     --workspace-id ${GRAFANA_WORKSPACE_ID} \
     --region us-east-2
 
-# 사용자 추가
+# Add the user
 aws grafana update-permissions \
     --workspace-id ${GRAFANA_WORKSPACE_ID} \
     --region us-east-2 \
     --update-instruction-batch '[{"action":"ADD","role":"ADMIN","users":[{"id":"your-email@example.com","type":"SSO_USER"}]}]'
 ```
 
-### 문제: AMP 데이터소스가 Grafana에 없음
+### Issue: AMP Data Source missing in Grafana
 
-**원인**: Lambda 함수 실행 실패
+**Cause**: Lambda function execution failed
 
-**해결:**
+**Solution:**
 ```bash
-# Lambda 로그 확인
+# Check the Lambda logs
 aws logs tail /aws/lambda/pcluster-infra-grafana-datasource-setup \
     --region us-east-2 \
     --follow
 
-# Lambda 함수 수동 재실행
+# Manually re-run the Lambda function
 aws lambda invoke \
     --function-name pcluster-infra-grafana-datasource-setup \
     --region us-east-2 \
@@ -313,73 +313,74 @@ aws lambda invoke \
 cat /tmp/lambda-output.json
 ```
 
-### 문제: Grafana에서 메트릭이 보이지 않음
+### Issue: Metrics not visible in Grafana
 
-**원인**: HeadNode Prometheus가 AMP로 메트릭을 전송하지 않음
+**Cause**: HeadNode Prometheus is not sending metrics to AMP
 
-**해결:**
+**Solution:**
 ```bash
-# HeadNode에서 Prometheus 상태 확인
+# Check the Prometheus status on the HeadNode
 ssh headnode
 sudo systemctl status prometheus
 
-# Prometheus 설정 확인
+# Verify the Prometheus configuration
 cat /opt/prometheus/prometheus.yml | grep -A10 remote_write
 
-# AMP endpoint 확인
+# Check the AMP endpoint
 curl -I https://aps-workspaces.us-east-2.amazonaws.com/workspaces/<workspace-id>/api/v1/remote_write
 ```
 
-### 문제: Identity Center가 활성화되지 않음
+### Issue: IAM Identity Center not enabled
 
-**원인**: AWS IAM Identity Center가 설정되지 않음
+**Cause**: AWS IAM Identity Center is not set up
 
-**해결:**
-1. AWS Console → IAM Identity Center
-2. "Enable" 클릭
-3. 조직 이메일 설정
-4. 사용자 추가
-5. Grafana 권한 부여
+**Solution:**
+1. Go to AWS Console → IAM Identity Center
+2. Click "Enable"
+3. Set up the organization email
+4. Add users
+5. Grant Grafana permissions
 
-## 💰 비용 예상
+## 💰 Cost Estimation
 
 ### AMP (AWS Managed Prometheus)
-- 메트릭 수집: $0.30 per million samples
-- 메트릭 저장: $0.03 per GB-month
-- 쿼리: $0.01 per million samples
-- **예상**: ~$10-30/month (워크로드에 따라)
+- Metric collection: $0.30 per million samples
+- Metric storage: $0.03 per GB-month
+- Queries: $0.01 per million samples
+- **Estimated**: ~$10-30/month (depending on workload)
 
 ### AMG (AWS Managed Grafana)
 - Workspace: $9/month per active user
-- **예상**: $9-90/month (사용자 수에 따라)
+- **Estimated**: $9-90/month (depending on the number of users)
 
-### 총 예상 비용
-- **1-5 사용자**: ~$60-80/month
-- **Self-hosting 대비**: 비슷하거나 약간 높음
-- **장점**: 완전 관리형, 자동 스케일링, 고가용성
+### Total Estimated Cost
+- **1-5 users**: ~$60-80/month
+- **Compared to self-hosting**: Similar or slightly higher
+- **Advantages**: Fully managed, auto-scaling, high availability
 
-## 📚 관련 문서
+## 📚 Related Documentation
 
 - [AWS Managed Prometheus](https://docs.aws.amazon.com/prometheus/)
 - [AWS Managed Grafana](https://docs.aws.amazon.com/grafana/)
 - [IAM Identity Center](https://docs.aws.amazon.com/singlesignon/)
 - [Prometheus Remote Write](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write)
 
-## 🎯 요약
+## 🎯 Summary
 
-### 자동화된 부분 ✅
-- AMP Workspace 생성
-- AMG Workspace 생성
-- AMP ↔ AMG 데이터소스 연결
-- ParallelCluster → AMP 메트릭 전송
+### Automated Parts ✅
+- AMP Workspace creation
+- AMG Workspace creation
+- AMP ↔ AMG data source connection
+- ParallelCluster → AMP metric sending
 
-### 수동 작업 필요 🔧
-- IAM Identity Center 활성화 (최초 1회)
-- Grafana 사용자 추가 (사용자당 1회)
-- 대시보드 생성 (선택)
+### Manual Tasks Needed 🔧
+- Enable IAM Identity Center (one-time)
+- Add Grafana users (per user)
+- Create dashboards (optional)
 
-### 소요 시간
-- Infrastructure 배포: ~10분
-- 사용자 추가: ~1분
-- 클러스터 생성: ~30분
-- **총**: ~40분 (대부분 자동)
+### Timeline
+- Infrastructure deployment: ~10 minutes
+- 
+- User addition: ~1 minute
+- Cluster creation: ~30 minutes
+- **Total**: ~40 minutes (mostly automated)
