@@ -4,14 +4,14 @@
 
 ## 📋 Table of Contents
 
-- [Quick Start](#quick-start)
-- [Dashboard Composition](#dashboard-composition)
-- [Installation Methods](#installation-methods)
-- [Instance Type-Specific Configuration](#instance-type-specific-configuration)
-- [Collected Metrics](#collected-metrics)
-- [File Structure](#file-structure)
-- [Dashboard Feature Details](#dashboard-feature-details)
-- [Troubleshooting](#troubleshooting)
+- [Quick Start](#Quick-Start)
+- [Dashboard Composition](#Dashboard-Composition)
+- [Installation Methods](#Installation-Methods)
+- [Instance Type-Specific Configuration](#Instance-Type-Specific-Configuration)
+- [Collected Metrics](#Collected-Metrics)
+- [File Structure](#File-Structure)
+- [Dashboard Feature Details](#Dashboard-Feature-Details)
+- [Troubleshooting](#Troubleshooting)
 
 ## 🚀 Quick Start (3 minutes)
 
