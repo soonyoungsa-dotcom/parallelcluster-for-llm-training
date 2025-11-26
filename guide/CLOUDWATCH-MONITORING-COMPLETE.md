@@ -1,152 +1,153 @@
-# ✅ ParallelCluster CloudWatch 모니터링 구현 완료
+# ✅ ParallelCluster CloudWatch Monitoring Implementation Complete
 
-## 🎯 목표 달성
+## 🎯 Goals Achieved
 
-분산학습 클러스터를 위한 **종합 모니터링 대시보드**를 성공적으로 구현했습니다.
+Successfully implemented a **comprehensive monitoring dashboard** for distributed learning clusters.
 
-### 대상 사용자
-- ✅ **인프라 관리자**: 클러스터 상태, 리소스 사용률, 비용 최적화
-- ✅ **모델 학습자**: 작업 큐, GPU 활용률, 학습 진행 상황
+### Target Users
+- ✅ **Infrastructure Administrators**: Cluster status, resource utilization, cost optimization
+- ✅ **Model Trainers**: Job queue, GPU utilization, training progress
 
-## 📦 구현 내용
+## 📦 Implementation Details
 
-### 1. 생성된 파일 (11개, 84KB)
+### 1. Generated Files (11 files, 84KB)
 
 ```
 config/cloudwatch/
-├── 📄 문서 (4개)
-│   ├── README.md                      # 전체 문서 (4.7KB)
-│   ├── QUICKSTART.md                  # 5분 빠른 시작 (4.9KB)
-│   ├── DASHBOARD-FEATURES.md          # 대시보드 기능 상세 (13KB)
-│   └── SUMMARY.md                     # 구현 요약 (7.4KB)
+├── 📄 Documentation (4 files)
+│   ├── README.md                      # Complete documentation (4.7KB)
+│   ├── QUICKSTART.md                  # 5-minute quickstart (4.9KB)
+│   ├── DASHBOARD-FEATURES.md          # Dashboard features detail (13KB)
+│   └── SUMMARY.md                     # Implementation summary (7.4KB)
 │
-├── 🔧 스크립트 (6개)
-│   ├── install-cloudwatch-agent.sh    # CloudWatch Agent 설치
-│   ├── slurm-metrics-collector.sh     # Slurm 메트릭 수집 (cron)
-│   ├── install-slurm-metrics.sh       # Slurm 메트릭 수집기 설치
-│   ├── create-dashboard.sh            # 기본 대시보드 생성
-│   ├── create-advanced-dashboard.sh   # 고급 대시보드 생성
-│   └── deploy-to-s3.sh                # S3 배포 스크립트
+├── 🔧 Scripts (6 files)
+│   ├── install-cloudwatch-agent.sh    # CloudWatch Agent installation
+│   ├── slurm-metrics-collector.sh     # Slurm metrics collection (cron)
+│   ├── install-slurm-metrics.sh       # Slurm metrics collector installation
+│   ├── create-dashboard.sh            # Basic dashboard creation
+│   ├── create-advanced-dashboard.sh   # Advanced dashboard creation
+│   └── deploy-to-s3.sh               # S3 deployment script
 │
-└── ⚙️ 설정 (1개)
-    └── cloudwatch-agent-config.json   # CloudWatch Agent 설정
+└── ⚙️ Configuration (1 file)
+    └── cloudwatch-agent-config.json   # CloudWatch Agent configuration
 ```
 
-### 2. 통합된 Setup 스크립트
+### 2. Integrated Setup Scripts
 
 **HeadNode** (`config/headnode/setup-headnode.sh`):
-- ✅ CloudWatch Agent 자동 설치
-- ✅ Slurm 메트릭 수집기 설치 (1분마다 실행)
-- ✅ Prometheus 설정 (DCGM/Node Exporter 수집)
+- ✅ Automatic installation of CloudWatch Agent
+- ✅ Installation of Slurm metric collector (runs every minute)
+- ✅ Prometheus configuration (DCGM/Node Exporter collection)
 
 **ComputeNode** (`config/compute/setup-compute-node.sh`):
-- ✅ CloudWatch Agent 자동 설치
-- ✅ DCGM Exporter 설정 (port 9400)
-- ✅ Node Exporter 설정 (port 9100)
+- ✅ Automatic installation of CloudWatch Agent
+- ✅ DCGM Exporter configuration (port 9400)
+- ✅ Node Exporter configuration (port 9100)
 
-## 📊 대시보드 구성
+## 📊 Dashboard Configuration
 
-### 기본 대시보드 (13개 위젯)
-1. ✅ 클러스터 개요 헤더
-2. ✅ CPU 사용률 (HeadNode + Compute)
-3. ✅ 메모리 사용률
-4. ✅ Slurm 에러 로그
-5. ✅ 네트워크 트래픽
-6. ✅ 디스크 사용률
-7. ✅ 디스크 I/O
-8. ✅ Slurm Resume 로그 (노드 시작)
-9. ✅ Slurm Suspend 로그 (노드 종료)
-10. ✅ GPU 모니터링 (DCGM)
-11. ✅ 클러스터 관리 로그
+### Basic Dashboard (13 widgets)
+1. ✅ Cluster Overview Header
+2. ✅ CPU Utilization (HeadNode + Compute)
+3. ✅ Memory Utilization
+4. ✅ Slurm Error Logs
+5. ✅ Network Traffic
+6. ✅ Disk Utilization
+7. ✅ Disk I/O
+8. ✅ Slurm Resume Logs (Node Start)
+9. ✅ Slurm Suspend Logs (Node Stop)
+10. ✅ GPU Monitoring (DCGM)
+11. ✅ Cluster Management Logs
 12. ✅ FSx Lustre I/O
 13. ✅ FSx Lustre Operations
 
-### 고급 대시보드 (12개 위젯)
-1. ✅ 클러스터 개요 헤더
-2. ✅ **Slurm 노드 상태** (Total/Idle/Allocated/Down)
-3. ✅ **Slurm 작업 큐 상태** (Running/Pending/Total)
-4. ✅ **노드 활용률 계산** (Allocated/Total * 100)
-5. ✅ 전체 노드 CPU 사용률
-6. ✅ 전체 노드 메모리 사용률
-7. ✅ Slurm 작업 완료/실패 로그
-8. ✅ 네트워크 트래픽 (EFA)
-9. ✅ FSx Lustre 처리량
-10. ✅ 디스크 사용률
-11. ✅ GPU 상태 모니터링
-12. ✅ NVIDIA 드라이버 로그
+### Advanced Dashboard (12 widgets)
+1. ✅ Cluster Overview Header
+2. ✅ **Slurm Node Status** (Total/Idle/Allocated/Down)
+3. ✅ **Slurm Job Queue Status** (Running/Pending/Total)
+4. ✅ **Node Utilization Calculation** (Allocated/Total * 100)
+5. ✅ Total Node CPU Utilization
+6. ✅ Total Node Memory Utilization
+7. ✅ Slurm Job Completion/Failure Logs
+8. ✅ Network Traffic (EFA)
+9. ✅ FSx Lustre Throughput
+10. ✅ Disk Utilization
+11. ✅ GPU Health Monitoring
+12. ✅ NVIDIA Driver Logs
 
-## 🚀 사용 방법 (5분)
+## 🚀 Usage (5 minutes)
 
-### 1단계: S3 배포
+### Step 1: S3 Deployment
 ```bash
 cd parallelcluster-for-llm
 source environment-variables-bailey.sh
 bash config/cloudwatch/deploy-to-s3.sh
 ```
 
-### 2단계: 클러스터 생성 (자동 설치)
+### Step 2: Create Cluster (Automatic Installation)
 ```bash
 pcluster create-cluster \
     --cluster-name ${CLUSTER_NAME} \
     --cluster-configuration cluster-config.yaml
 ```
 
-### 3단계: 대시보드 생성
+### Step 3: Create Dashboards
 ```bash
-# 기본 대시보드
+# Basic Dashboard
 bash config/cloudwatch/create-dashboard.sh ${CLUSTER_NAME} ${AWS_REGION}
 
-# 고급 대시보드 (Slurm 메트릭)
+# Advanced Dashboard (Slurm Metrics)
 bash config/cloudwatch/create-advanced-dashboard.sh ${CLUSTER_NAME} ${AWS_REGION}
 ```
 
-### 4단계: 대시보드 확인
+### Step 4: Verify Dashboards
 ```
 https://console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards:
 ```
 
-## 📈 수집 메트릭
+## 📈 Collected Metrics
 
-### CloudWatch Agent (자동)
+### CloudWatch Agent (Automatic)
 - **CPU**: usage_idle, usage_iowait
 - **Memory**: used_percent, available, used
 - **Disk**: used_percent, free, used, I/O
 - **Network**: tcp_established, tcp_time_wait
 
-### Slurm 메트릭 (1분마다)
+### Slurm Metrics (Every Minute)
 - **NodesTotal, NodesIdle, NodesAllocated, NodesDown**
 - **JobsRunning, JobsPending, JobsTotal**
 
-### 로그 수집 (7개 로그 그룹)
+### Log Collection (7 Log Groups)
 - Slurm (slurmctld, slurmd)
 - Slurm Resume/Suspend
-- DCGM (GPU 모니터링)
-- NVIDIA 드라이버
-- 클러스터 관리 (clustermgtd)
+- DCGM (GPU Monitoring)
+- NVIDIA Driver
+- Cluster Management (clustermgtd)
 
-## ✨ 주요 특징
+## ✨ Key Features
 
-### 1. 완전 자동화
-- ✅ 클러스터 생성 시 자동 설치
-- ✅ Slurm 메트릭 자동 수집 (cron)
-- ✅ Prometheus 자동 설정 (EC2 service discovery)
+### 1. Fully Automated
+- ✅ Automatic installation during cluster creation
+- ✅ Automatic Slurm metric collection (cron)
+- ✅ Automatic Prometheus configuration (EC2 service discovery)
 
-### 2. 사용자 친화적
-- ✅ 5분 빠른 시작 가이드
-- ✅ 한글 대시보드 제목 및 설명
-- ✅ 직관적인 위젯 배치
+### 2. User-Friendly
+- ✅ 5-minute quick start guide
+- ✅ Korean dashboard titles and descriptions
+- ✅ Intuitive widget placement
 
-### 3. 확장 가능
-- ✅ 커스텀 메트릭 추가 용이
-- ✅ 대시보드 위젯 수정 가능
-- ✅ 알람 설정 예제 제공
+### 3. Extensible
+- ✅ Easy to add custom metrics
+- ✅ Customizable dashboard widgets
+- ✅ Provided alarm configuration examples
 
-### 4. 비용 최적화
-- ✅ 로그 보관 기간: 7일 (기본값)
-- ✅ 메트릭 수집 주기: 60초
-- ✅ 불필요한 메트릭 제외
+### 4. Cost-Optimized
+- ✅ Log retention period: 7 days (default)
+- ✅ Metric collection frequency: 60 seconds
+- ✅ Exclusion of unnecessary metrics
 
-## 🔍 검증 완료
+  
+## 🔍 Verification Completed
 
 ```bash
 ✓ All shell scripts are syntactically valid
@@ -155,86 +156,86 @@ https://console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards:
 ✓ 11 files created (84KB)
 ```
 
-## 📚 문서
+## 📚 Documentation
 
-### 빠른 시작
-- **[QUICKSTART.md](config/cloudwatch/QUICKSTART.md)** - 5분 빠른 시작 가이드
+### Quick Start
+- **[QUICKSTART.md](config/cloudwatch/QUICKSTART.md)** - 5-minute quick start guide
 
-### 상세 문서
-- **[README.md](config/cloudwatch/README.md)** - 전체 설치 및 설정 가이드
-- **[DASHBOARD-FEATURES.md](config/cloudwatch/DASHBOARD-FEATURES.md)** - 대시보드 기능 상세
-- **[SUMMARY.md](config/cloudwatch/SUMMARY.md)** - 구현 요약
+### Detailed Documentation
+- **[README.md](config/cloudwatch/README.md)** - Full installation and configuration guide
+- **[DASHBOARD-FEATURES.md](config/cloudwatch/DASHBOARD-FEATURES.md)** - Detailed dashboard features
+- **[SUMMARY.md](config/cloudwatch/SUMMARY.md)** - Implementation summary
 
-### 통합 문서
-- **[config/README.md](config/README.md)** - 전체 config 디렉토리 가이드 (업데이트됨)
+### Integrated Documentation
+- **[config/README.md](config/README.md)** - Guide for the entire config directory (updated)
 
-## 🎉 완료 상태
+## 🎉 Completion Status
 
-| 항목 | 상태 |
-|------|------|
-| CloudWatch Agent 설정 | ✅ 완료 |
-| Slurm 메트릭 수집 | ✅ 완료 |
-| 기본 대시보드 | ✅ 완료 (13개 위젯) |
-| 고급 대시보드 | ✅ 완료 (12개 위젯) |
-| 자동 설치 통합 | ✅ 완료 |
-| 문서화 | ✅ 완료 (4개 문서) |
-| 스크립트 검증 | ✅ 완료 |
-| S3 배포 스크립트 | ✅ 완료 |
+| Item | Status |
+|------|--------|
+| CloudWatch Agent Configuration | ✅ Completed |
+| Slurm Metric Collection | ✅ Completed |
+| Basic Dashboard | ✅ Completed (13 widgets) |
+| Advanced Dashboard | ✅ Completed (12 widgets) |
+| Automatic Installation Integration | ✅ Completed |
+| Documentation | ✅ Completed (4 documents) |
+| Script Validation | ✅ Completed |
+| S3 Deployment Script | ✅ Completed |
 
-## 🔗 다음 단계
+## 🔗 Next Steps
 
-### 1. 즉시 사용 가능
+### 1. Immediate Usability
 ```bash
-# S3 배포
+# S3 Deployment
 bash config/cloudwatch/deploy-to-s3.sh
 
-# 클러스터 생성
+# Cluster Creation
 pcluster create-cluster --cluster-name ${CLUSTER_NAME} --cluster-configuration cluster-config.yaml
 
-# 대시보드 생성
+# Dashboard Creation
 bash config/cloudwatch/create-dashboard.sh ${CLUSTER_NAME} ${AWS_REGION}
 bash config/cloudwatch/create-advanced-dashboard.sh ${CLUSTER_NAME} ${AWS_REGION}
 ```
 
-### 2. 선택적 커스터마이징
-- 알람 설정 (예제 제공)
-- 대시보드 위젯 추가/수정
-- 메트릭 수집 주기 조정
-- 로그 보관 기간 변경
+### 2. Optional Customization
+- Alarm Configuration (Provided Examples)
+- Dashboard Widget Addition/Modification
+- Metric Collection Frequency Adjustment
+- Log Retention Period Change
 
-### 3. 모니터링 확인
+### 3. Monitoring Verification
 ```bash
-# CloudWatch Agent 상태
+# CloudWatch Agent Status
 ssh headnode
 sudo systemctl status amazon-cloudwatch-agent
 
-# Slurm 메트릭 로그
+# Slurm Metric Logs
 tail -f /var/log/slurm-metrics.log
 
-# 대시보드 접근
+# Dashboard Access
 https://console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards:
 ```
 
-## 💡 핵심 가치
+## 💡 Key Value Propositions
 
-### 인프라 관리자
-- 📊 클러스터 전체 상태를 한눈에 파악
-- 💰 리소스 사용률 추적으로 비용 최적화
-- 🚨 장애 감지 및 즉시 대응
-- 📈 노드 스케일링 정책 데이터 기반 조정
+### Infrastructure Administrators
+- 📊 Comprehensive cluster status at a glance
+- 💰 Resource utilization tracking for cost optimization
+- 🚨 Rapid incident detection and response
+- 📈 Data-driven node scaling policy adjustments
 
-### 모델 학습자
-- ⏱️ 작업 큐 상태 실시간 확인
-- 🎮 GPU 활용률 모니터링
-- 📝 학습 진행 상황 추적
-- ✅ 노드 가용성 확인
-- 🔍 작업 실패 원인 분석
+### Model Trainers
+- ⏱️ Real-time visibility into job queue status
+- 🎮 GPU utilization monitoring
+- 📝 Training progress tracking
+- ✅ Node availability verification
+- 🔍 Job failure root cause analysis
 
 ---
 
-**구현 완료일**: 2025-11-20  
-**버전**: 1.0  
-**상태**: ✅ Production Ready  
-**총 작업 시간**: ~2시간  
-**파일 수**: 11개 (84KB)  
-**코드 라인**: 1,601 lines
+**Completed On**: 2025-11-20  
+**Version**: 1.0  
+**Status**: ✅ Production Ready  
+**Total Work Time**: ~2 hours  
+**File Count**: 11 (84KB)  
+**Code Lines**: 1,601
