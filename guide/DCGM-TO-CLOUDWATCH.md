@@ -1,58 +1,58 @@
-# DCGM 메트릭을 CloudWatch에서 보는 방법
+# How to View DCGM Metrics in CloudWatch
 
-DCGM (NVIDIA Data Center GPU Manager) 메트릭을 CloudWatch에서 확인하는 방법입니다.
+This is a guide on how to view DCGM (NVIDIA Data Center GPU Manager) metrics in CloudWatch.
 
-## 📊 현재 아키텍처
+## 📊 Current Architecture
 
 ```
 ComputeNode (GPU)
   └─ DCGM Exporter (port 9400)
        └─ Prometheus (HeadNode)
-            ├─ Grafana (시각화)
+            ├─ Grafana (Visualization)
             └─ AMP (AWS Managed Prometheus)
 ```
 
-**문제**: CloudWatch에서는 DCGM 메트릭을 볼 수 없음
+**Problem**: DCGM metrics cannot be viewed in CloudWatch.
 
-## 🎯 해결 방법
+## 🎯 Solution Approaches
 
-### 방법 1: DCGM → CloudWatch 직접 전송 (권장)
+### Method 1: Direct DCGM to CloudWatch Integration (Recommended)
 
-Prometheus에서 DCGM 메트릭을 스크랩하여 CloudWatch로 전송합니다.
+Scrape DCGM metrics from Prometheus and send them directly to CloudWatch.
 
-#### 설치
+#### Installation
 
 ```bash
-# HeadNode에서 실행
+# Run on HeadNode
 ssh headnode
 
-# S3에서 스크립트 다운로드
+# Download script from S3
 aws s3 cp s3://${S3_BUCKET}/config/cloudwatch/dcgm-to-cloudwatch.sh /tmp/
 chmod +x /tmp/dcgm-to-cloudwatch.sh
 
-# 설치
+# Install
 sudo bash /tmp/dcgm-to-cloudwatch.sh ${CLUSTER_NAME} ${AWS_REGION}
 ```
 
-#### 확인
+#### Verification
 
 ```bash
-# 서비스 상태 확인
+# Check service status
 sudo systemctl status dcgm-cloudwatch-exporter
 
-# 로그 확인
+# Check logs
 sudo journalctl -u dcgm-cloudwatch-exporter -f
 
-# CloudWatch 메트릭 확인
+# Check CloudWatch metrics
 aws cloudwatch list-metrics \
     --namespace "ParallelCluster/${CLUSTER_NAME}/GPU" \
     --region ${AWS_REGION}
 ```
 
-#### CloudWatch에서 확인
+#### View in CloudWatch
 
 ```bash
-# GPU 사용률 확인
+# Check GPU Utilization
 aws cloudwatch get-metric-statistics \
     --namespace "ParallelCluster/${CLUSTER_NAME}/GPU" \
     --metric-name GPUUtilization \
@@ -63,25 +63,25 @@ aws cloudwatch get-metric-statistics \
     --region ${AWS_REGION}
 ```
 
-### 방법 2: CloudWatch 대시보드에 추가
+### Method 2: Add to CloudWatch Dashboard
 
-기존 CloudWatch 대시보드에 GPU 메트릭 위젯을 추가합니다.
+Add a GPU metrics widget to the existing CloudWatch dashboard.
 
-#### 대시보드 업데이트
+#### Update Dashboard
 
 ```bash
-# 현재 대시보드 가져오기
+# Fetch current dashboard
 aws cloudwatch get-dashboard \
     --dashboard-name "ParallelCluster-${CLUSTER_NAME}" \
     --region ${AWS_REGION} \
     --query 'DashboardBody' \
     --output text > /tmp/dashboard.json
 
-# GPU 위젯 추가 (수동 편집)
-# 또는 자동 스크립트 사용
+# Manually edit to add GPU widget
+# or use an automated script
 ```
 
-#### GPU 위젯 JSON
+#### GPU Widget JSON
 
 ```json
 {
@@ -98,7 +98,7 @@ aws cloudwatch get-dashboard \
         "view": "timeSeries",
         "stacked": false,
         "region": "${AWS_REGION}",
-        "title": "GPU 사용률",
+        "title": "GPU Utilization",
         "period": 60,
         "yAxis": {
             "left": {
@@ -110,29 +110,29 @@ aws cloudwatch get-dashboard \
 }
 ```
 
-## 📈 수집되는 GPU 메트릭
+## 📈 Collected GPU Metrics
 
-### DCGM Exporter가 제공하는 메트릭
+### Metrics Provided by DCGM Exporter
 
-| Prometheus 메트릭 | CloudWatch 메트릭 | 단위 | 설명 |
-|-------------------|-------------------|------|------|
-| `DCGM_FI_DEV_GPU_UTIL` | GPUUtilization | Percent | GPU 사용률 |
-| `DCGM_FI_DEV_MEM_COPY_UTIL` | GPUMemoryUtilization | Percent | GPU 메모리 사용률 |
-| `DCGM_FI_DEV_GPU_TEMP` | GPUTemperature | None | GPU 온도 (°C) |
-| `DCGM_FI_DEV_POWER_USAGE` | GPUPowerUsage | None | GPU 전력 소비 (W) |
-| `DCGM_FI_DEV_FB_USED` | GPUMemoryUsed | Megabytes | 사용 중인 GPU 메모리 |
-| `DCGM_FI_DEV_FB_FREE` | GPUMemoryFree | Megabytes | 사용 가능한 GPU 메모리 |
+| Prometheus Metric | CloudWatch Metric | Unit | Description |
+|-------------------|-------------------|------|-------------|
+| `DCGM_FI_DEV_GPU_UTIL` | GPUUtilization | Percent | GPU Utilization |
+| `DCGM_FI_DEV_MEM_COPY_UTIL` | GPUMemoryUtilization | Percent | GPU Memory Utilization |
+| `DCGM_FI_DEV_GPU_TEMP` | GPUTemperature | None | GPU Temperature (°C) |
+| `DCGM_FI_DEV_POWER_USAGE` | GPUPowerUsage | None | GPU Power Consumption (W) |
+| `DCGM_FI_DEV_FB_USED` | GPUMemoryUsed | Megabytes | Used GPU Memory |
+| `DCGM_FI_DEV_FB_FREE` | GPUMemoryFree | Megabytes | Available GPU Memory |
 
 ### Dimensions
 
-- `InstanceId`: EC2 인스턴스 ID
-- `GPU`: GPU 번호 (0-7 for p5en.48xlarge)
+- `InstanceId`: EC2 Instance ID
+- `GPU`: GPU Number (0-7 for p5en.48xlarge)
 
-## 🔄 자동 설치 (HeadNode Setup에 통합)
+## 🔄 Automatic Installation (Integrated into HeadNode Setup)
 
-HeadNode setup 스크립트에 자동으로 추가하려면:
+To automatically add the DCGM to CloudWatch integration into the HeadNode setup script:
 
-### 1. S3에 스크립트 업로드
+### 1. Upload Script to S3
 
 ```bash
 cd parallelcluster-for-llm
@@ -141,9 +141,9 @@ aws s3 cp config/cloudwatch/dcgm-to-cloudwatch.sh \
     --region ${AWS_REGION}
 ```
 
-### 2. setup-headnode.sh 수정
+### 2. Modify setup-headnode.sh
 
-`config/headnode/setup-headnode.sh`에 다음 추가:
+Add the following to `config/headnode/setup-headnode.sh`:
 
 ```bash
 # Install DCGM to CloudWatch Exporter
@@ -163,22 +163,22 @@ aws s3 cp config/cloudwatch/dcgm-to-cloudwatch.sh \
 ) || echo "⚠️  DCGM to CloudWatch exporter installation failed (non-critical)"
 ```
 
-### 3. 클러스터 재생성
+### 3. Recreate the Cluster
 
 ```bash
-# 기존 클러스터 삭제
+# Delete existing cluster
 pcluster delete-cluster --cluster-name ${CLUSTER_NAME} --region ${AWS_REGION}
 
-# 새 클러스터 생성 (자동으로 DCGM → CloudWatch 설치됨)
+# Create new cluster (DCGM to CloudWatch integration will be installed automatically)
 pcluster create-cluster \
     --cluster-name ${CLUSTER_NAME} \
     --cluster-configuration cluster-config.yaml \
     --region ${AWS_REGION}
 ```
 
-## 📊 CloudWatch 대시보드 예제
+## 📊 CloudWatch Dashboard Example
 
-### GPU 모니터링 대시보드
+### GPU Monitoring Dashboard
 
 ```json
 {
@@ -189,7 +189,7 @@ pcluster create-cluster \
                 "metrics": [
                     [ "ParallelCluster/${CLUSTER_NAME}/GPU", "GPUUtilization", { "stat": "Average" } ]
                 ],
-                "title": "GPU 사용률",
+                "title": "GPU Utilization",
                 "region": "${AWS_REGION}",
                 "period": 60
             }
@@ -200,7 +200,7 @@ pcluster create-cluster \
                 "metrics": [
                     [ "ParallelCluster/${CLUSTER_NAME}/GPU", "GPUTemperature", { "stat": "Maximum" } ]
                 ],
-                "title": "GPU 온도",
+                "title": "GPU Temperature",
                 "region": "${AWS_REGION}",
                 "period": 60,
                 "yAxis": {
@@ -217,7 +217,7 @@ pcluster create-cluster \
                 "metrics": [
                     [ "ParallelCluster/${CLUSTER_NAME}/GPU", "GPUPowerUsage", { "stat": "Average" } ]
                 ],
-                "title": "GPU 전력 소비",
+                "title": "GPU Power Consumption",
                 "region": "${AWS_REGION}",
                 "period": 60
             }
@@ -229,7 +229,7 @@ pcluster create-cluster \
                     [ "ParallelCluster/${CLUSTER_NAME}/GPU", "GPUMemoryUsed", { "stat": "Average" } ],
                     [ ".", "GPUMemoryFree", { "stat": "Average" } ]
                 ],
-                "title": "GPU 메모리",
+                "title": "GPU Memory",
                 "region": "${AWS_REGION}",
                 "period": 60
             }
@@ -238,108 +238,108 @@ pcluster create-cluster \
 }
 ```
 
-## 🛠️ 트러블슈팅
+## 🛠️ Troubleshooting
 
-### 문제: CloudWatch에 메트릭이 나타나지 않음
+### Issue: Metrics not appearing in CloudWatch
 
-**확인 사항:**
+**Troubleshooting Steps:**
 
-1. 서비스 상태 확인
+1. Check service status
 ```bash
 sudo systemctl status dcgm-cloudwatch-exporter
 ```
 
-2. 로그 확인
+2. Check logs
 ```bash
 sudo journalctl -u dcgm-cloudwatch-exporter -f
 ```
 
-3. Prometheus 연결 확인
+3. Verify Prometheus connection
 ```bash
 curl http://localhost:9090/api/v1/query?query=DCGM_FI_DEV_GPU_UTIL
 ```
 
-4. IAM 권한 확인
+4. Check IAM permissions
 ```bash
-# HeadNode IAM 역할에 CloudWatch PutMetricData 권한 필요
+# HeadNode IAM role needs CloudWatch PutMetricData permission
 aws iam list-attached-role-policies --role-name <HeadNode-Role>
 ```
 
-### 문제: 일부 GPU만 메트릭이 보임
+### Issue: Only some GPUs have metrics
 
-**원인**: DCGM Exporter가 일부 ComputeNode에서만 실행 중
+**Cause**: DCGM Exporter is running on some ComputeNodes only
 
-**해결:**
+**Solution:**
 ```bash
-# 모든 ComputeNode에서 DCGM Exporter 상태 확인
+# Check DCGM Exporter status on all ComputeNodes
 srun --nodes=all systemctl status dcgm-exporter
 ```
 
-### 문제: 메트릭 지연
+### Issue: Metric Latency
 
-**원인**: 기본 스크랩 간격이 60초
+**Cause**: Default scrape interval is 60 seconds
 
-**해결:**
+**Solution:**
 ```bash
-# 스크랩 간격 변경 (30초)
+# Change scrape interval to 30 seconds
 sudo systemctl edit dcgm-cloudwatch-exporter
 
-# 추가:
+# Add:
 [Service]
 Environment="SCRAPE_INTERVAL=30"
 
-# 재시작
+# Restart
 sudo systemctl restart dcgm-cloudwatch-exporter
 ```
 
-## 💰 비용 영향
+## 💰 Cost Considerations
 
-### CloudWatch 메트릭 비용
+### CloudWatch Metric Costs
 
-- **커스텀 메트릭**: $0.30 per metric per month
-- **API 요청**: $0.01 per 1,000 GetMetricStatistics requests
+- **Custom Metrics**: $0.30 per metric per month
+- **API Requests**: $0.01 per 1,000 GetMetricStatistics requests
 
-### 예상 비용 (p5en.48xlarge x 2 nodes)
+### Estimated Cost (p5en.48xlarge x 2 nodes)
 
-- GPU 메트릭: 6개 x 8 GPUs x 2 nodes = 96 metrics
-- 월 비용: 96 x $0.30 = **$28.80/month**
+- GPU Metrics: 6 x 8 GPUs x 2 nodes = 96 metrics
+- Monthly Cost: 96 x $0.30 = **$28.80/month**
 
-### 비용 절감 팁
+### Cost Optimization Tips
 
-1. **필요한 메트릭만 수집**
+1. **Collect Only Necessary Metrics**
 ```python
-# dcgm-to-cloudwatch.sh에서 불필요한 메트릭 제거
+# Remove unnecessary metrics in dcgm-to-cloudwatch.sh
 DCGM_METRICS = {
-    'DCGM_FI_DEV_GPU_UTIL': {...},  # 필수
-    'DCGM_FI_DEV_GPU_TEMP': {...},  # 필수
-    # 'DCGM_FI_DEV_FB_FREE': {...},  # 제거
+    'DCGM_FI_DEV_GPU_UTIL': {...},  # Essential
+    'DCGM_FI_DEV_GPU_TEMP': {...},  # Essential
+    # 'DCGM_FI_DEV_FB_FREE': {...},  # Remove
 }
 ```
 
-2. **스크랩 간격 늘리기**
+2. **Increase Scrape Interval**
 ```bash
-Environment="SCRAPE_INTERVAL=300"  # 5분마다
+Environment="SCRAPE_INTERVAL=300"  # 5 minutes
 ```
 
-## 📚 관련 문서
+## 📚 Related Documentation
 
 - [DCGM Exporter](https://github.com/NVIDIA/dcgm-exporter)
 - [CloudWatch Custom Metrics](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html)
 - [Prometheus Python Client](https://github.com/prometheus/client_python)
 
-## 🎯 요약
+## 🎯 Summary
 
-### 권장 방법: DCGM → CloudWatch 직접 전송
+### Recommended Method: Direct DCGM to CloudWatch Integration
 
-**장점:**
-- ✅ CloudWatch 대시보드에서 GPU 메트릭 확인 가능
-- ✅ CloudWatch Alarms 설정 가능
-- ✅ 다른 AWS 서비스와 통합 용이
+**Pros:**
+- ✅ View GPU metrics in CloudWatch dashboard
+- ✅ Set CloudWatch Alarms
+- ✅ Easily integrate with other AWS services
 
-**단점:**
-- ⚠️ 추가 비용 (~$30/month for 2 nodes)
-- ⚠️ 약간의 지연 (60초 스크랩 간격)
+**Cons:**
+- ⚠️ Additional cost (~$30/month for 2 nodes)
+- ⚠️ Slightly delayed (60-second scrape interval)
 
-**대안:**
-- Grafana만 사용 (비용 없음, 실시간)
-- AMP + AMG 사용 (완전 관리형)
+**Alternatives:**
+- Use Grafana only (no cost, real-time)
+- Use AMP + AMG (fully managed)
