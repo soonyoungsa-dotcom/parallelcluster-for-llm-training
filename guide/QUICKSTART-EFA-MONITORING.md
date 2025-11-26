@@ -1,79 +1,79 @@
-# EFA 네트워크 모니터링 빠른 시작 가이드
+# Quick Start Guide to EFA Network Monitoring
 
-## 개요
+## Overview
 
-EFA (Elastic Fabric Adapter) 네트워크 모니터링은 GPU 인스턴스 간 통신 성능을 실시간으로 추적합니다.
+EFA (Elastic Fabric Adapter) network monitoring tracks the real-time communication performance between GPU instances.
 
-## 자동 설치
+## Automatic Installation
 
-EFA 모니터링은 **GPU 컴퓨트 노드에 자동으로 설치**됩니다. 별도 설정이 필요 없습니다.
+EFA monitoring is **automatically installed on GPU compute nodes**. No additional setup is required.
 
-### 설치 조건
+### Installation Prerequisites
 
-- ✅ 인스턴스 타입: EFA 지원 (p4d, p5, p5en)
-- ✅ Setup Type: `gpu` (5번째 인자)
-- ✅ S3에 스크립트 업로드 완료
+- ✅ Instance Type: EFA-enabled (p4d, p5, p5en)
+- ✅ Setup Type: `gpu` (5th argument)
+- ✅ Scripts uploaded to S3
 
-## 배포 단계
+## Deployment Steps
 
-### 1. 스크립트 업로드
+### 1. Upload Scripts
 
 ```bash
 cd parallelcluster-for-llm
 source environment-variables-bailey.sh
 
-# 모니터링 스크립트 업로드
+# Upload monitoring scripts
 bash scripts/upload-monitoring-scripts.sh ${S3_BUCKET} ${REGION}
 ```
 
-### 2. 클러스터 설정 생성
+### 2. Create Cluster Configuration
 
 ```bash
-# 환경 변수로 설정 생성
+# Generate config from template
 envsubst < cluster-config.yaml.template > cluster-config.yaml
 ```
 
-### 3. 클러스터 생성 또는 업데이트
+### 3. Create or Update Cluster
 
 ```bash
-# 새 클러스터 생성
+# Create new cluster
 pcluster create-cluster \
   --cluster-name ${CLUSTER_NAME} \
   --cluster-configuration cluster-config.yaml
 
-# 기존 클러스터 업데이트
+# Update existing cluster
 pcluster update-cluster \
   --cluster-name ${CLUSTER_NAME} \
   --cluster-configuration cluster-config.yaml
 ```
 
-### 4. 확인
+### 4. Verification
 
 ```bash
-# 컴퓨트 노드에 SSH 접속
+# SSH to a compute node
 pcluster ssh --cluster-name ${CLUSTER_NAME} -i ~/.ssh/${KEY_PAIR_NAME}.pem
 
-# EFA 모니터링 서비스 상태 확인
+# Check EFA monitoring service status
 sudo systemctl status efa-monitor
 
-# 실시간 로그 확인
+# View real-time logs
 sudo tail -f /var/log/efa_monitor.log
 
-# 출력 예시:
+# Example output:
 # rdmap0s6: RX=125.34 Mbps, TX=98.21 Mbps
 ```
 
-## 메트릭 확인
+## Metric Visibility
 
-### CloudWatch 메트릭
+### CloudWatch Metrics
 
 ```bash
-# 메트릭 목록 확인
+# List available metrics
 aws cloudwatch list-metrics \
   --namespace ParallelCluster/Network \
   --region ${REGION}
 
-# 메트릭 조회
+# Query a specific metric
 aws cloudwatch get-metric-statistics \
   --namespace ParallelCluster/Network \
   --metric-name rx_bytes_rate \
@@ -85,172 +85,172 @@ aws cloudwatch get-metric-statistics \
   --region ${REGION}
 ```
 
-### CloudWatch 대시보드
+### CloudWatch Dashboard
 
-대시보드는 HeadNode 초기화 시 자동으로 생성됩니다:
+The dashboard is automatically created during HeadNode initialization:
 
 ```bash
-# 대시보드 URL 확인
+# Check dashboard URL
 echo "https://console.aws.amazon.com/cloudwatch/home?region=${REGION}#dashboards:name=ParallelCluster-${CLUSTER_NAME}-EFA"
 ```
 
-또는 수동으로 생성:
+Or create it manually:
 
 ```bash
 cd parallelcluster-for-llm/config/cloudwatch
 bash create-efa-dashboard.sh ${CLUSTER_NAME} ${REGION}
 ```
 
-## 수집되는 메트릭
+## Collected Metrics
 
-| 메트릭 | 단위 | 설명 |
-|--------|------|------|
-| `rx_bytes_rate` | Bytes/Second | 수신 처리량 |
-| `tx_bytes_rate` | Bytes/Second | 송신 처리량 |
-| `rx_packets_rate` | Count/Second | 수신 패킷 속도 |
-| `tx_packets_rate` | Count/Second | 송신 패킷 속도 |
-| `rx_errors` | Count | 수신 오류 (누적) |
-| `tx_discards` | Count | 송신 폐기 (누적) |
+| Metric | Unit | Description |
+|--------|------|-------------|
+| `rx_bytes_rate` | Bytes/Second | Receive Throughput |
+| `tx_bytes_rate` | Bytes/Second | Transmit Throughput |
+| `rx_packets_rate` | Count/Second | Receive Packet Rate |
+| `tx_packets_rate` | Count/Second | Transmit Packet Rate |
+| `rx_errors` | Count | Receive Errors (cumulative) |
+| `tx_discards` | Count | Transmit Discards (cumulative) |
 
-## 성능 기준
+## Performance Baseline
 
 ### p5en.48xlarge
 
-- **EFA 대역폭**: 3200 Gbps (400 GB/s)
-- **EFA 인터페이스**: 32x 100 Gbps
-- **예상 처리량**:
+- **EFA Bandwidth**: 3200 Gbps (400 GB/s)
+- **EFA Interfaces**: 32x 100 Gbps
+- **Expected Throughput**:
   - NCCL All-Reduce: ~2800 Gbps
   - Point-to-point: ~3000 Gbps
 
-### 정상 동작 확인
+### Validation
 
 ```bash
-# 학습 중 EFA 사용률 확인
+# Check EFA utilization during training
 sudo tail -f /var/log/efa_monitor.log
 
-# 예상 출력 (학습 중):
-# rdmap0s6: RX=2500.00 Mbps, TX=2500.00 Mbps  ← 높은 처리량
-# rdmap0s6: RX=0.00 Mbps, TX=0.00 Mbps        ← 유휴 상태
+# Expected output (during training):
+# rdmap0s6: RX=2500.00 Mbps, TX=2500.00 Mbps  ← High throughput
+# rdmap0s6: RX=0.00 Mbps, TX=0.00 Mbps        ← Idle state
 
-# 오류 확인 (0이어야 정상)
+# Verify errors (should be 0)
 grep -E "rx_errors|tx_discards" /var/log/efa_monitor.log
 ```
 
-## 문제 해결
+## Troubleshooting
 
-### 서비스가 시작되지 않음
+### Service Doesn't Start
 
 ```bash
-# 상세 로그 확인
+# Check detailed logs
 sudo journalctl -u efa-monitor -n 50
 
-# EFA 인터페이스 확인
+# Verify EFA interface
 ls -la /sys/class/infiniband/
 
-# 수동 실행 (테스트)
+# Manual execution (for testing)
 sudo python3 /opt/monitoring/efa_network_monitor.py
 ```
 
-### CloudWatch에 메트릭이 없음
+### No Metrics in CloudWatch
 
 ```bash
-# IAM 권한 확인
+# Check IAM permissions
 aws cloudwatch put-metric-data \
   --namespace Test \
   --metric-name TestMetric \
   --value 1
 
-# 스크립트 실행 확인
+# Verify script execution
 ps aux | grep efa_network_monitor
 
-# 로그 확인
+# Check logs
 sudo tail -100 /var/log/efa_monitor.log
 ```
 
-### CPU 사용률이 높음
+### High CPU Usage
 
-정상적으로 <5% CPU를 사용해야 합니다. 높은 경우:
+The script should normally use less than 5% CPU. If it's high:
 
 ```bash
-# 수집 간격 확인 (60초여야 함)
+# Check collection interval (should be 60 seconds)
 grep COLLECTION_INTERVAL /opt/monitoring/efa_network_monitor.py
 
-# 서비스 재시작
+# Restart the service
 sudo systemctl restart efa-monitor
 ```
 
-## 비용
+## Cost Considerations
 
-### 월간 예상 비용 (4 노드)
+### Expected Monthly Cost (4 Nodes)
 
-- **메트릭**: 6개 × 4노드 × $0.30 = $7.20
-- **API 호출**: ~17,000회 × $0.01/1000 = $0.17
-- **대시보드**: $3.00
-- **총계**: ~$10.37/월
+- **Metrics**: 6 x 4 nodes x $0.30 = $7.20
+- **API Calls**: ~17,000 x $0.01/1000 = $0.17
+- **Dashboard**: $3.00
+- **Total**: ~$10.37/month
 
-### 비용 최적화
+### Cost Optimization
 
 ```bash
-# 수집 간격 늘리기 (API 호출 감소)
+# Increase collection interval (reduce API calls)
 sudo vim /opt/monitoring/efa_network_monitor.py
-# COLLECTION_INTERVAL = 300  # 5분으로 변경
+# COLLECTION_INTERVAL = 300  # Change to 5 minutes
 
-# 배치 크기 늘리기
-# BATCH_SIZE = 10  # 10분으로 변경
+# Increase batch size
+# BATCH_SIZE = 10  # Change to 10 minutes
 
-# 서비스 재시작
+# Restart the service
 sudo systemctl restart efa-monitor
 ```
 
-## 서비스 관리
+## Service Management
 
 ```bash
-# 상태 확인
+# Check status
 sudo systemctl status efa-monitor
 
-# 시작
+# Start
 sudo systemctl start efa-monitor
 
-# 중지
+# Stop
 sudo systemctl stop efa-monitor
 
-# 재시작
+# Restart
 sudo systemctl restart efa-monitor
 
-# 부팅 시 자동 시작 활성화
+# Enable autostart at boot
 sudo systemctl enable efa-monitor
 
-# 부팅 시 자동 시작 비활성화
+# Disable autostart at boot
 sudo systemctl disable efa-monitor
 
-# 로그 확인
+# View logs
 sudo journalctl -u efa-monitor -f
 sudo tail -f /var/log/efa_monitor.log
 ```
 
-## 통합 모니터링
+## Integrated Monitoring
 
-EFA 모니터링은 다른 모니터링 도구와 함께 작동합니다:
+EFA monitoring works alongside other monitoring tools:
 
-- **DCGM Exporter**: GPU 메트릭 (포트 9400)
-- **Node Exporter**: 시스템 메트릭 (포트 9100)
-- **CloudWatch Agent**: 시스템 + 커스텀 메트릭
-- **Prometheus**: 메트릭 집계 (HeadNode)
+- **DCGM Exporter**: GPU metrics (port 9400)
+- **Node Exporter**: System metrics (port 9100)
+- **CloudWatch Agent**: System + custom metrics
+- **Prometheus**: Metric aggregation (HeadNode)
 
-모든 메트릭은 다음에서 확인 가능:
+All metrics are available in:
 - CloudWatch (AWS Console)
-- Prometheus (self-hosting 모드)
-- Grafana (AMG 사용 시)
+- Prometheus (self-hosting mode)
+- Grafana (when using AMG)
 
-## 관련 문서
+## Related Documentation
 
-- [EFA 모니터링 상세 가이드](guide/EFA-MONITORING.md)
-- [DCGM 모니터링](guide/DCGM-TO-CLOUDWATCH.md)
-- [NVLink 모니터링](guide/NVLINK-MONITORING.md)
-- [CloudWatch 모니터링](guide/MONITORING.md)
+- [Detailed EFA Monitoring Guide](guide/EFA-MONITORING.md)
+- [DCGM Monitoring](guide/DCGM-TO-CLOUDWATCH.md)
+- [NVLink Monitoring](guide/NVLINK-MONITORING.md)
+- [CloudWatch Monitoring](guide/MONITORING.md)
 
-## 참고 자료
+## References
 
-- [AWS EFA 문서](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html)
-- [EFA 성능](https://aws.amazon.com/hpc/efa/)
+- [AWS EFA Documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html)
+- [EFA Performance](https://aws.amazon.com/hpc/efa/)
 - [NCCL with EFA](https://github.com/aws/aws-ofi-nccl)
