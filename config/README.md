@@ -1,19 +1,19 @@
-# ParallelCluster 노드별 설치 스크립트
+# ParallelCluster Node-Specific Installation Scripts
 
-각 노드 타입별로 역할에 맞는 소프트웨어만 설치하여 효율적인 클러스터 구성을 제공합니다.
+These scripts install software tailored to the specific roles of each node type, providing an efficient cluster configuration.
 
-## 📋 노드별 설치 항목
+## 📋 Node-Specific Installation Items
 
-### Login Node (사용자 SSH 접속용)
-**목적**: 사용자가 코드 작성 및 작업 제출  
-**설치 항목**:
-- CloudWatch Agent (시스템 메트릭 전송)
-- 기본 개발 도구 (vim, git, htop)
+### Login Node (for user SSH access)
+**Purpose**: Users write code and submit jobs  
+**Installed Items**:
+- CloudWatch Agent (sends system metrics)
+- Basic development tools (vim, git, htop)
 
-**스크립트**: `config/loginnode/setup-loginnode.sh`
+**Script**: `config/loginnode/setup-loginnode.sh`
 
 ```bash
-# 최소한의 설치로 빠른 부팅과 낮은 리소스 사용
+# Minimal installation for fast boot and low resource usage
 apt-get install -y vim git htop
 wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
 dpkg -i amazon-cloudwatch-agent.deb
@@ -22,25 +22,25 @@ dpkg -i amazon-cloudwatch-agent.deb
 ---
 
 ### Head Node (Slurm controller)
-**목적**: 클러스터 관리 + 모니터링 메트릭 수집  
-**설치 항목**:
-- CloudWatch Agent (시스템 메트릭)
-- Slurm controller/scheduler (ParallelCluster 자동 설치)
-- Prometheus (Compute Node의 DCGM 메트릭 수집)
+**Purpose**: Cluster management + monitoring metric collection  
+**Installed Items**:
+- CloudWatch Agent (system metrics)
+- Slurm controller/scheduler (automatically installed by ParallelCluster)
+- Prometheus (collects DCGM metrics from Compute Nodes)
 
-**스크립트**: `config/headnode/setup-headnode.sh`
+**Script**: `config/headnode/setup-headnode.sh`
 
 ```bash
 # CloudWatch Agent
 wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
 dpkg -i amazon-cloudwatch-agent.deb
 
-# Prometheus (Compute Node 메트릭 수집)
+# Prometheus (Collect Compute Node metrics)
 wget https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz
 tar xvf prometheus-2.45.0.linux-amd64.tar.gz
 mv prometheus-2.45.0.linux-amd64 /opt/prometheus
 
-# Prometheus 설정 - EC2 Auto-discovery
+# Prometheus configuration - EC2 Auto-discovery
 cat > /opt/prometheus/prometheus.yml <<EOF
 scrape_configs:
   - job_name: 'dcgm'
@@ -58,25 +58,25 @@ EOF
 
 ---
 
-### Compute Node (실제 작업 실행)
-**목적**: GPU 학습 및 추론 작업 실행  
-**설치 항목**:
-- **필수**:
-  - NVIDIA Driver (AMI에 포함)
+### Compute Node (Run actual workloads)
+**Purpose**: Run GPU training and inference workloads  
+**Installed Items**:
+- **Required**:
+  - NVIDIA Driver (included in the AMI)
   - CUDA Toolkit
-  - NCCL (멀티 GPU 통신)
-  - EFA Driver + libfabric (p4d/p5 고속 네트워킹)
+  - NCCL (multi-GPU communication)
+  - EFA Driver + libfabric (p4d/p5 high-speed networking)
   - CloudWatch Agent
-- **강력 추천**:
+- **Strongly Recommended**:
   - Docker + NVIDIA Container Toolkit
   - Pyxis/Enroot (Slurm container plugin)
-  - DCGM Exporter (GPU 메트릭 → Prometheus)
-  - Node Exporter (시스템 메트릭 → Prometheus)
+  - DCGM Exporter (GPU metrics → Prometheus)
+  - Node Exporter (system metrics → Prometheus)
 
-**스크립트**: `config/compute/setup-compute-node.sh`
+**Script**: `config/compute/setup-compute-node.sh`
 
 ```bash
-# 병렬 설치로 시간 단축
+# Parallel installation to save time
 {
     # EFA
     curl -O https://efa-installer.amazonaws.com/aws-efa-installer-latest.tar.gz
@@ -109,7 +109,7 @@ EOF
 
 wait
 
-# Docker 의존성 있는 것들
+# Docker-dependent items
 # Pyxis
 cd /tmp
 git clone https://github.com/NVIDIA/pyxis.git
@@ -137,9 +137,10 @@ systemctl enable dcgm-exporter
 systemctl start dcgm-exporter
 ```
 
+
 ---
 
-## 🔄 데이터 흐름
+## 🔄 Data Flow
 
 ```
 Login Node → CloudWatch Agent → CloudWatch
@@ -152,51 +153,51 @@ Nodes      → DCGM (9400) ─────┘
            → Node Exporter (9100) ─┘
 ```
 
-### 모니터링 포트
+### Monitoring Ports
 - **9090**: Prometheus (Head Node)
-- **9100**: Node Exporter (Compute Nodes - 시스템 메트릭)
-- **9400**: DCGM Exporter (Compute Nodes - GPU 메트릭)
-- **3000**: Grafana (별도 Monitoring Instance)
+- **9100**: Node Exporter (Compute Nodes - system metrics)
+- **9400**: DCGM Exporter (Compute Nodes - GPU metrics)
+- **3000**: Grafana (separate Monitoring Instance)
 
 ---
 
-## 📦 S3 업로드
+## 📦 Uploading to S3
 
-스크립트를 S3에 업로드하여 ParallelCluster CustomActions에서 사용:
+Upload the scripts to S3 for use in ParallelCluster CustomActions:
 
 ```bash
-# 전체 config 폴더 업로드
+# Upload the entire config folder
 aws s3 sync config/ s3://your-bucket/config/ --region us-east-1
 
-# 업로드 확인
+# Verify the upload
 aws s3 ls s3://your-bucket/config/ --recursive
 ```
 
 ---
 
-## 🚀 사용 방법
+## 🚀 Usage
 
-### 1. environment-variables.sh 설정
+### 1. Set environment-variables.sh
 
 ```bash
-# 각 노드별 설치 활성화
-export ENABLE_LOGINNODE_SETUP="true"    # LoginNode 설정
-export ENABLE_HEADNODE_SETUP="true"     # HeadNode 설정
-export ENABLE_COMPUTE_SETUP="true"      # ComputeNode 설정
+# Enable setup for each node type
+export ENABLE_LOGINNODE_SETUP="true"    # LoginNode setup
+export ENABLE_HEADNODE_SETUP="true"     # HeadNode setup
+export ENABLE_COMPUTE_SETUP="true"      # ComputeNode setup
 
 export S3_BUCKET="your-bucket-name"
 export CLUSTER_NAME="my-cluster"
 export AWS_REGION="us-east-1"
 ```
 
-### 2. 클러스터 설정 생성
+### 2. Create cluster configuration
 
 ```bash
 source environment-variables.sh
 envsubst < cluster-config.yaml.template > cluster-config.yaml
 ```
 
-### 3. 클러스터 생성
+### 3. Create the cluster
 
 ```bash
 pcluster create-cluster \
@@ -206,19 +207,19 @@ pcluster create-cluster \
 
 ---
 
-## ⏱️ 예상 설치 시간
+## ⏱️ Expected Installation Times
 
-| 노드 타입 | 설치 시간 | 주요 항목 |
-|----------|----------|----------|
-| Login Node | ~2분 | CloudWatch + 기본 도구 |
-| Head Node | ~5분 | CloudWatch + Prometheus |
-| Compute Node | ~15-20분 | EFA + NCCL + Docker + DCGM (병렬 설치) |
+| Node Type | Installation Time | Key Items |
+|----------|-------------------|----------|
+| Login Node | ~2 minutes | CloudWatch + basic tools |
+| Head Node | ~5 minutes | CloudWatch + Prometheus |
+| Compute Node | ~15-20 minutes | EFA + NCCL + Docker + DCGM (parallel installation) |
 
 ---
 
-## 🔍 문제 해결
+## 🔍 Troubleshooting
 
-### 스크립트 실행 로그 확인
+### Check script execution logs
 
 ```bash
 # Head Node
@@ -229,7 +230,7 @@ sudo tail -f /var/log/parallelcluster/clustermgtd
 sudo tail -f /var/log/cloud-init-output.log
 ```
 
-### 서비스 상태 확인
+### Check service status
 
 ```bash
 # Prometheus (Head Node)
@@ -247,7 +248,7 @@ curl http://localhost:9100/metrics
 
 ---
 
-## 📚 참고 자료
+## 📚 References
 
 - [AWS ParallelCluster Documentation](https://docs.aws.amazon.com/parallelcluster/)
 - [NVIDIA DCGM Exporter](https://github.com/NVIDIA/dcgm-exporter)
@@ -257,116 +258,116 @@ curl http://localhost:9100/metrics
 
 ---
 
-## 📊 CloudWatch 모니터링
+## 📊 CloudWatch Monitoring
 
-### 종합 대시보드 솔루션
+### Comprehensive Dashboard Solution
 
-**위치**: `config/cloudwatch/`
+**Location**: `config/cloudwatch/`
 
-**목적**: 인프라 관리자와 모델 학습자를 위한 실시간 모니터링 대시보드
+**Purpose**: Real-time monitoring dashboards for infrastructure managers and model trainers
 
-**주요 기능**:
-- ✅ 실시간 시스템 메트릭 (CPU, 메모리, 디스크, 네트워크)
-- ✅ Slurm 작업 큐 및 노드 상태 모니터링
-- ✅ GPU 모니터링 (DCGM)
-- ✅ FSx Lustre I/O 성능
-- ✅ 로그 수집 및 분석 (Slurm, DCGM, 클러스터 관리)
+**Key Features**:
+- ✅ Real-time system metrics (CPU, memory, disk, network)
+- ✅ Slurm job queue and node status monitoring
+- ✅ GPU monitoring (DCGM)
+- ✅ FSx Lustre I/O performance
+- ✅ Log collection and analysis (Slurm, DCGM, cluster management)
 
-### 빠른 시작 (5분)
+### Quick Start (5 minutes)
 
 ```bash
-# 1. S3에 설정 업로드
+# 1. Upload the configuration to S3
 cd parallelcluster-for-llm
 source environment-variables-bailey.sh
 bash config/cloudwatch/deploy-to-s3.sh
 
-# 2. 클러스터 생성/업데이트 (자동으로 모니터링 설치됨)
+# 2. Create/update the cluster (monitoring setup is automatic)
 pcluster create-cluster --cluster-name ${CLUSTER_NAME} --cluster-configuration cluster-config.yaml
 
-# 3. 대시보드 생성
+# 3. Create the dashboards
 bash config/cloudwatch/create-dashboard.sh ${CLUSTER_NAME} ${AWS_REGION}
 bash config/cloudwatch/create-advanced-dashboard.sh ${CLUSTER_NAME} ${AWS_REGION}
 ```
 
-### 대시보드 종류
+### Dashboard Types
 
-**1. 기본 대시보드** (`create-dashboard.sh`)
-- CPU/메모리/디스크 사용률
-- 네트워크 및 FSx Lustre I/O
-- Slurm 로그 (에러, resume, suspend)
-- GPU 모니터링 (DCGM)
-- 클러스터 관리 로그
+**1. Default Dashboard** (`create-dashboard.sh`)
+- CPU/memory/disk utilization
+- Network and FSx Lustre I/O
+- Slurm logs (error, resume, suspend)
+- GPU monitoring (DCGM)
+- Cluster management logs
 
-**2. 고급 대시보드** (`create-advanced-dashboard.sh`)
-- Slurm 노드 상태 (Total/Idle/Allocated/Down)
-- 작업 큐 상태 (Running/Pending/Total)
-- 노드 활용률 계산
-- 작업 완료/실패 로그
-- GPU 상태 실시간 모니터링
+**2. Advanced Dashboard** (`create-advanced-dashboard.sh`)
+- Slurm node status (Total/Idle/Allocated/Down)
+- Job queue status (Running/Pending/Total)
+- Node utilization calculation
+- Job completion/failure logs
+- Real-time GPU status monitoring
 
-### 자동 설치 내용
+### Automatic Installation
 
-클러스터 생성 시 자동으로 설치됩니다:
+Installed automatically during cluster creation:
 
-- **HeadNode**: CloudWatch Agent + Slurm 메트릭 수집기 + Prometheus
+- **HeadNode**: CloudWatch Agent + Slurm metrics collector + Prometheus
 - **ComputeNode**: CloudWatch Agent + DCGM Exporter + Node Exporter
 - **LoginNode**: CloudWatch Agent
 
-### 파일 구조
+### File Structure
 
 ```
 cloudwatch/
-├── README.md                          # 전체 문서
-├── QUICKSTART.md                      # 5분 빠른 시작 가이드
-├── cloudwatch-agent-config.json       # CloudWatch Agent 설정
-├── install-cloudwatch-agent.sh        # CloudWatch Agent 설치
-├── slurm-metrics-collector.sh         # Slurm 메트릭 수집
-├── install-slurm-metrics.sh           # Slurm 메트릭 수집기 설치
-├── create-dashboard.sh                # 기본 대시보드 생성
-├── create-advanced-dashboard.sh       # 고급 대시보드 (Slurm 메트릭)
-└── deploy-to-s3.sh                    # S3 배포 스크립트
+├── README.md                          # Full documentation
+├── QUICKSTART.md                      # 5-minute quick start guide
+├── cloudwatch-agent-config.json       # CloudWatch Agent configuration
+├── install-cloudwatch-agent.sh        # CloudWatch Agent installation
+├── slurm-metrics-collector.sh         # Slurm metrics collector
+├── install-slurm-metrics.sh           # Slurm metrics collector installation
+├── create-dashboard.sh                # Create default dashboard
+├── create-advanced-dashboard.sh       # Create advanced dashboard (Slurm metrics)
+└── deploy-to-s3.sh                    # S3 deployment script
 ```
 
-### 수집되는 메트릭
+### Collected Metrics
 
-**시스템 메트릭** (CloudWatch Agent):
-- CPU: 사용률, idle, iowait
-- 메모리: 사용률, available, used
-- 디스크: 사용률, I/O (read/write bytes)
-- 네트워크: TCP 연결 상태
+**System Metrics** (CloudWatch Agent):
+- CPU: utilization, idle, iowait
+- Memory: utilization, available, used
+- Disk: utilization, I/O (read/write bytes)
+- Network: TCP connection status
 
-**Slurm 메트릭** (Custom):
-- 노드 상태: Total, Idle, Allocated, Down
-- 작업 상태: Running, Pending, Total
+**Slurm Metrics** (Custom):
+- Node status: Total, Idle, Allocated, Down
+- Job status: Running, Pending, Total
 
-**로그 수집**:
-- `/var/log/slurmctld.log` - Slurm 컨트롤러
-- `/var/log/slurmd.log` - Slurm 데몬
-- `/var/log/parallelcluster/slurm_resume.log` - 노드 시작
-- `/var/log/parallelcluster/slurm_suspend.log` - 노드 종료
-- `/var/log/dcgm/nv-hostengine.log` - GPU 모니터링
-- `/var/log/nvidia-installer.log` - NVIDIA 드라이버
+**Log Collection**:
+- `/var/log/slurmctld.log` - Slurm controller
+- `/var/log/slurmd.log` - Slurm daemon
+- `/var/log/parallelcluster/slurm_resume.log` - Node start
+- `/var/log/parallelcluster/slurm_suspend.log` - Node stop
+- `/var/log/dcgm/nv-hostengine.log` - GPU monitoring
+- `/var/log/nvidia-installer.log` - NVIDIA driver
 
-### 대시보드 접근
+### Accessing the Dashboards
 
 AWS Console:
 ```
 https://console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards:
 ```
 
-또는 CLI:
+Or CLI:
 ```bash
 aws cloudwatch list-dashboards --region ${AWS_REGION}
 ```
 
-### 상세 문서
+### Detailed Documentation
 
-- [cloudwatch/README.md](cloudwatch/README.md) - 전체 문서 및 커스터마이징
-- [cloudwatch/QUICKSTART.md](cloudwatch/QUICKSTART.md) - 5분 빠른 시작 가이드
+- [cloudwatch/README.md](cloudwatch/README.md) - Full documentation and customization
+- [cloudwatch/QUICKSTART.md](cloudwatch/QUICKSTART.md) - 5-minute quick start guide
 
 ---
 
-## 🔄 업데이트된 데이터 흐름
+## 🔄 Updated Data Flow
 
 ```
 Login Node → CloudWatch Agent → CloudWatch Logs/Metrics
@@ -380,22 +381,22 @@ Nodes      → DCGM (9400) ─────┘
            → Node Exporter (9100) ─┘
 ```
 
-### 모니터링 포트
+### Monitoring Ports
 - **9090**: Prometheus (Head Node)
-- **9100**: Node Exporter (Compute Nodes - 시스템 메트릭)
-- **9400**: DCGM Exporter (Compute Nodes - GPU 메트릭)
+- **9100**: Node Exporter (Compute Nodes - system metrics)
+- **9400**: DCGM Exporter (Compute Nodes - GPU metrics)
 
 ---
 
-## 💡 추가 팁
+## 💡 Additional Tips
 
-### CloudWatch 비용 최적화
-- 로그 보관 기간: 7일 (기본값, `cloudwatch-agent-config.json`에서 변경 가능)
-- 메트릭 수집 주기: 60초 (필요시 조정)
-- 불필요한 로그 필터링
+### CloudWatch Cost Optimization
+- Log retention period: 7 days (default, can be changed in `cloudwatch-agent-config.json`)
+- Metric collection interval: 60 seconds (adjust as needed)
+- Filter out unnecessary logs
 
-### 알람 설정
-CloudWatch Alarms를 사용하여 임계값 초과 시 알림:
+### Setting Alarms
+Use CloudWatch Alarms to get notifications when thresholds are exceeded:
 ```bash
 aws cloudwatch put-metric-alarm \
     --alarm-name high-cpu-usage \
@@ -409,15 +410,15 @@ aws cloudwatch put-metric-alarm \
     --evaluation-periods 2
 ```
 
-### 로그 쿼리 예제
-CloudWatch Logs Insights에서 고급 쿼리:
+### Log Query Examples
+Advanced queries in CloudWatch Logs Insights:
 ```
-# Slurm 작업 실패 분석
+# Analyze Slurm job failures
 fields @timestamp, @message
 | filter @message like /FAILED|ERROR/
 | stats count() by bin(5m)
 
-# GPU 온도 모니터링
+# Monitor GPU temperatures
 fields @timestamp, @message
 | filter @message like /Temperature/
 | parse @message /Temperature: (?<temp>\d+)/
