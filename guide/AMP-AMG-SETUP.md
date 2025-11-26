@@ -380,7 +380,6 @@ curl -I https://aps-workspaces.us-east-2.amazonaws.com/workspaces/<workspace-id>
 
 ### Timeline
 - Infrastructure deployment: ~10 minutes
-- 
 - User addition: ~1 minute
 - Cluster creation: ~30 minutes
 - **Total**: ~40 minutes (mostly automated)
