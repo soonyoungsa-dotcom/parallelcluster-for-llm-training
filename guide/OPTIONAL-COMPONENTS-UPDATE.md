@@ -1,255 +1,358 @@
-# ✅ Optional Components 업데이트 완료
+# Guide to Monitor ComputeNode Installation Progress
 
-## 🎯 목표 달성
+## Overview
 
-Compute node에서 EFA Installer, DCGM Exporter, Node Exporter를 선택적으로 설치할 수 있도록 개선했습니다.
+ComputeNode installation takes about 15-20 minutes, and the following components are installed sequentially:
+1. EFA Driver (5-10 minutes)
+2. Docker + NVIDIA Container Toolkit (3 minutes)
+3. Pyxis (2 minutes)
+4. CloudWatch Agent (1 minute)
+5. DCGM Exporter (1 minute)
+6. Node Exporter (1 minute)
+7. NCCL Configuration (5 seconds, if applicable)
 
-## 📝 변경 사항
+## 🔍 Monitoring Methods
 
-### 1. environment-variables-bailey.sh
-새로운 선택적 플래그 추가:
-
-```bash
-# ComputeNode: Optional components
-export ENABLE_EFA_INSTALLER="true"      # EFA 고속 네트워킹 (p4d, p5만 지원)
-export ENABLE_DCGM_EXPORTER="true"      # GPU 메트릭 (GPU 인스턴스만)
-export ENABLE_NODE_EXPORTER="true"      # 시스템 메트릭 (Prometheus용)
-```
-
-### 2. config/compute/setup-compute-node.sh
-- 7번째 파라미터로 `ENABLE_EFA_INSTALLER` 추가
-- EFA Installer 설치를 조건부로 변경
-- DCGM Exporter에 GPU 감지 로직 추가
-- Node Exporter를 선택적으로 설치
-- 최종 요약에 각 컴포넌트 설치 상태 표시
-
-### 3. 문서 업데이트
-- **NON-GPU-COMPUTE-NODES.md** (8.4KB, 270 lines)
-  - Non-GPU/Non-EFA 가이드로 확장
-  - 인스턴스 타입별 권장 설정 추가
-  - 4가지 설정 예제 제공
-- **README.md** 업데이트
-  - EFA 설정 섹션 추가
-  - 인스턴스 타입별 설정 테이블
-
-## 🎯 인스턴스 타입별 권장 설정
-
-### GPU + EFA (p5en, p5, p4d) - 멀티 노드 분산 학습
-```bash
-export ENABLE_EFA_INSTALLER="true"      # ✅ 고속 네트워킹 (3.2Tbps)
-export ENABLE_DCGM_EXPORTER="true"      # ✅ GPU 메트릭
-export ENABLE_NODE_EXPORTER="true"      # ✅ 시스템 메트릭
-```
-
-**설치되는 항목:**
-- ✅ EFA Driver + libfabric
-- ✅ DCGM Exporter (port 9400)
-- ✅ Node Exporter (port 9100)
-- ✅ CloudWatch Agent
-- ✅ Docker, NCCL
-
-**사용 사례:** 대규모 멀티 노드 GPU 학습
-
----
-
-### GPU Only (g5, g4dn) - 단일 노드 학습
-```bash
-export ENABLE_EFA_INSTALLER="false"     # ❌ EFA 미지원
-export ENABLE_DCGM_EXPORTER="true"      # ✅ GPU 메트릭
-export ENABLE_NODE_EXPORTER="true"      # ✅ 시스템 메트릭
-```
-
-**설치되는 항목:**
-- ❌ EFA Driver (비활성화)
-- ✅ DCGM Exporter (port 9400)
-- ✅ Node Exporter (port 9100)
-- ✅ CloudWatch Agent
-- ✅ Docker
-
-**사용 사례:** 단일 노드 GPU 학습, 추론
-
----
-
-### Non-GPU (c5, m5, r5) - 일반 컴퓨팅
-```bash
-export ENABLE_EFA_INSTALLER="false"     # ❌ EFA 미지원
-export ENABLE_DCGM_EXPORTER="false"     # ❌ GPU 없음
-export ENABLE_NODE_EXPORTER="true"      # ✅ 시스템 메트릭
-```
-
-**설치되는 항목:**
-- ❌ EFA Driver (비활성화)
-- ❌ DCGM Exporter (비활성화)
-- ✅ Node Exporter (port 9100)
-- ✅ CloudWatch Agent
-- ✅ Docker
-
-**사용 사례:** 데이터 전처리, CPU 작업
-
----
-
-### 최소 설정 (테스트/개발)
-```bash
-export ENABLE_EFA_INSTALLER="false"     # ❌ EFA 미지원
-export ENABLE_DCGM_EXPORTER="false"     # ❌ GPU 없음
-export ENABLE_NODE_EXPORTER="false"     # ❌ Prometheus 사용 안 함
-```
-
-**설치되는 항목:**
-- ❌ EFA Driver (비활성화)
-- ❌ DCGM Exporter (비활성화)
-- ❌ Node Exporter (비활성화)
-- ✅ CloudWatch Agent (기본 로그만)
-- ✅ Docker
-
-**사용 사례:** 빠른 테스트, 최소 설정
-
-## 📊 비교 테이블
-
-| 컴포넌트 | GPU+EFA (p5) | GPU Only (g5) | Non-GPU (c5) | 최소 설정 |
-|----------|--------------|---------------|--------------|-----------|
-| **EFA Installer** | ✅ true | ❌ false | ❌ false | ❌ false |
-| **DCGM Exporter** | ✅ true | ✅ true | ❌ false | ❌ false |
-| **Node Exporter** | ✅ true | ✅ true | ✅ true | ❌ false |
-| **CloudWatch Agent** | ✅ 항상 | ✅ 항상 | ✅ 항상 | ✅ 항상 |
-| **고속 네트워킹** | ✅ 3.2Tbps | ❌ | ❌ | ❌ |
-| **GPU 메트릭** | ✅ | ✅ | ❌ | ❌ |
-| **시스템 메트릭** | ✅ | ✅ | ✅ | ❌ |
-| **설치 시간** | ~20분 | ~15분 | ~10분 | ~5분 |
-
-## 🚀 사용 방법
-
-### 1단계: 환경 변수 설정
-```bash
-cd parallelcluster-for-llm
-vim environment-variables-bailey.sh
-
-# 인스턴스 타입에 맞게 설정
-export ENABLE_EFA_INSTALLER="false"     # EFA 미지원 인스턴스
-export ENABLE_DCGM_EXPORTER="false"     # Non-GPU 인스턴스
-export ENABLE_NODE_EXPORTER="true"      # Prometheus 사용 시
-```
-
-### 2단계: 설정 생성 및 배포
-```bash
-# 환경 변수 로드
-source environment-variables-bailey.sh
-
-# 클러스터 설정 생성
-envsubst < cluster-config.yaml.template > cluster-config.yaml
-
-# S3 업로드
-aws s3 sync config/ s3://${S3_BUCKET}/config/ --region ${AWS_REGION}
-```
-
-### 3단계: 클러스터 생성/업데이트
-```bash
-# 새 클러스터
-pcluster create-cluster --cluster-name ${CLUSTER_NAME} --cluster-configuration cluster-config.yaml
-
-# 기존 클러스터 업데이트
-pcluster update-cluster --cluster-name ${CLUSTER_NAME} --cluster-configuration cluster-config.yaml
-```
-
-### 4단계: 확인
-```bash
-# Compute Node에 SSH 접속
-ssh compute-node-1
-
-# EFA 확인 (활성화 시)
-ls -la /dev/infiniband/
-/opt/amazon/efa/bin/fi_info --version
-
-# DCGM Exporter 확인 (활성화 시)
-sudo systemctl status dcgm-exporter
-curl http://localhost:9400/metrics
-
-# Node Exporter 확인 (활성화 시)
-sudo systemctl status node-exporter
-curl http://localhost:9100/metrics
-```
-
-## ✅ 검증 완료
+### Method 1: Automatic Monitoring Script (Recommended)
 
 ```bash
-✓ Shell script 문법 검증 통과
-✓ 환경 변수 스크립트 검증 통과
-✓ 모든 인스턴스 타입 지원 (p5, g5, c5 등)
-✓ GPU 자동 감지 로직 추가
-✓ EFA 선택적 설치 지원
+# Run during or after cluster creation
+bash scripts/monitor-compute-node-setup.sh p5en-48xlarge-cluster us-east-2
 ```
 
-## 📚 문서
+**Output**:
+- CloudFormation stack status
+- EC2 instance status
+- Installation progress from CloudWatch logs
+- Instructions to access the HeadNode
 
-### 상세 가이드
-- **[NON-GPU-COMPUTE-NODES.md](config/cloudwatch/NON-GPU-COMPUTE-NODES.md)** (8.4KB, 270 lines)
-  - 인스턴스 타입별 권장 설정
-  - 4가지 설정 예제
-  - 트러블슈팅 가이드
+### Method 2: Real-time CloudWatch Logs Monitoring
 
-### 업데이트된 문서
-- **[config/cloudwatch/README.md](config/cloudwatch/README.md)** - EFA 설정 섹션 추가
-- **[environment-variables-bailey.sh](environment-variables-bailey.sh)** - 3개 플래그 추가
-
-## 💡 주요 이점
-
-### 1. 비용 절감
-- EFA 미지원 인스턴스에서 불필요한 설치 제거
-- 설치 시간 단축 (20분 → 5-10분)
-
-### 2. 유연성
-- 인스턴스 타입에 맞는 최적 설정
-- 테스트/프로덕션 환경 분리 가능
-
-### 3. 안정성
-- GPU 자동 감지로 설치 실패 방지
-- 각 컴포넌트 독립적으로 제어
-
-### 4. 모니터링 최적화
-- 필요한 메트릭만 수집
-- Prometheus 부하 감소
-
-## 🔄 마이그레이션 가이드
-
-### 기존 설정 (모두 설치)
 ```bash
-# 기본값 - 변경 불필요
-export ENABLE_EFA_INSTALLER="true"
-export ENABLE_DCGM_EXPORTER="true"
-export ENABLE_NODE_EXPORTER="true"
+# Stream real-time logs
+aws logs tail /aws/parallelcluster/p5en-48xlarge-cluster \
+  --region us-east-2 \
+  --follow \
+  --filter-pattern "Compute"
+
+# Filter only installation steps
+aws logs tail /aws/parallelcluster/p5en-48xlarge-cluster \
+  --region us-east-2 \
+  --follow \
+  --filter-pattern "\"Installing\" OR \"✓\" OR \"Complete\""
 ```
 
-### Non-GPU 인스턴스로 변경
+### Method 3: Verify Specific Component Installation
+
 ```bash
-# c5, m5, r5 등으로 변경 시
-export ENABLE_EFA_INSTALLER="false"
-export ENABLE_DCGM_EXPORTER="false"
-export ENABLE_NODE_EXPORTER="true"  # Prometheus 사용 시
+CLUSTER_NAME="p5en-48xlarge-cluster"
+REGION="us-east-2"
+
+# Verify EFA installation
+aws logs filter-log-events \
+  --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
+  --region ${REGION} \
+  --filter-pattern "\"Installing EFA\" OR \"EFA installation complete\"" \
+  --max-items 10
+
+# Verify Docker installation
+aws logs filter-log-events \
+  --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
+  --region ${REGION} \
+  --filter-pattern "\"Installing Docker\" OR \"Docker installation complete\"" \
+  --max-items 10
+
+# Verify NCCL configuration
+aws logs filter-log-events \
+  --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
+  --region ${REGION} \
+  --filter-pattern "\"NCCL\" OR \"nccl\"" \
+  --max-items 10
 ```
 
-### GPU Only 인스턴스로 변경
+### Method 4: Check EC2 Instance Status
+
 ```bash
-# g5, g4dn 등으로 변경 시
-export ENABLE_EFA_INSTALLER="false"
-export ENABLE_DCGM_EXPORTER="true"
-export ENABLE_NODE_EXPORTER="true"
+# List ComputeNode instances
+aws ec2 describe-instances \
+  --filters "Name=tag:aws:cloudformation:stack-name,Values=${CLUSTER_NAME}" \
+            "Name=tag:Name,Values=Compute" \
+  --region ${REGION} \
+  --query 'Reservations[*].Instances[*].{ID:InstanceId,State:State.Name,IP:PrivateIpAddress,LaunchTime:LaunchTime}' \
+  --output table
+
+# If instances are in the "shutting-down" state, a timeout has occurred
+# If instances remain in the "running" state, the installation is in progress
 ```
 
-## 🎉 완료 상태
+### Method 5: Check Directly on the HeadNode
 
-| 항목 | 상태 |
-|------|------|
-| EFA Installer 선택적 설치 | ✅ 완료 |
-| DCGM Exporter 선택적 설치 | ✅ 완료 |
-| Node Exporter 선택적 설치 | ✅ 완료 |
-| GPU 자동 감지 | ✅ 완료 |
-| 문서 업데이트 | ✅ 완료 |
-| 스크립트 검증 | ✅ 완료 |
-| 인스턴스 타입별 가이드 | ✅ 완료 |
+```bash
+# SSH to the HeadNode
+ssh headnode
 
----
+# Check Slurm node status
+sinfo -N -l
 
-**업데이트 완료일**: 2025-11-20  
-**버전**: 1.1  
-**상태**: ✅ Production Ready  
-**지원 인스턴스**: p5, p4d, g5, g4dn, c5, m5, r5 등 모든 타입
+# Run the installation status check script on a ComputeNode
+srun --nodes=1 bash /fsx/scripts/check-compute-setup.sh
+
+# Check all ComputeNodes
+srun --nodes=ALL bash /fsx/scripts/check-compute-setup.sh
+```
+
+## 📊 Log Messages by Installation Phase
+
+### 1. Initialization Phase
+```
+=== Compute Node Setup Started ===
+Cluster Name: p5en-48xlarge-cluster
+Region: us-east-2
+Checking FSx Lustre mount...
+✓ FSx Lustre mounted at /fsx
+```
+
+### 2. Parallel Installation Phase
+```
+Installing EFA...
+Installing Docker + NVIDIA Container Toolkit...
+Installing CloudWatch Agent...
+```
+
+### 3. EFA Installation (Takes the longest)
+```
+GPU detected - installing with GPU support
+Installed EFA packages:
+✓ EFA installation complete
+```
+
+### 4. Docker Installation
+```
+✓ Docker + NVIDIA Container Toolkit installation complete
+```
+
+### 5. Pyxis Installation
+```
+Installing Pyxis (Slurm container plugin)...
+✓ Pyxis installation complete
+(or)
+⚠️  Pyxis build failed (non-critical)
+```
+
+### 6. Monitoring Configuration
+```
+Configuring DCGM Exporter...
+✓ DCGM Exporter configured (port 9400)
+Installing Node Exporter...
+✓ Node Exporter configured (port 9100)
+```
+
+### 7. NCCL Configuration (if applicable)
+```
+Checking for shared NCCL installation...
+Found shared NCCL, configuring environment...
+✓ Shared NCCL configured
+(or)
+⚠️  Shared NCCL not found in /fsx/nccl/
+```
+
+### 8. Completion
+```
+✓ Compute Node Setup Complete
+Installed components:
+  - EFA Driver + libfabric
+  - Docker + NVIDIA Container Toolkit
+  - Pyxis (Slurm container plugin)
+  - CloudWatch Agent
+  - DCGM Exporter (port 9400) - GPU metrics
+  - Node Exporter (port 9100) - System metrics
+```
+
+## 🚨 Troubleshooting
+
+### Timeout Occurred (Nodes are "shutting-down")
+
+```bash
+# Check CloudFormation events
+aws cloudformation describe-stack-events \
+  --stack-name ${CLUSTER_NAME} \
+  --region ${REGION} \
+  --query 'StackEvents[?contains(ResourceStatusReason, `timeout`) || contains(ResourceStatusReason, `Timeout`)]'
+
+# Check the last log entries (where it got stuck)
+aws logs get-log-events \
+  --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
+  --log-stream-name "ip-10-1-XX-XX.i-XXXXX.cloud-init-output" \
+  --region ${REGION} \
+  --limit 100 \
+  --start-from-head \
+  --query 'events[-20:].message' \
+  --output text
+```
+
+**Common Timeout Causes**:
+1. EFA installation failure (network issue)
+2. Docker installation failure
+3. Pyxis build failure (missing Slurm headers) ← Already fixed
+4. Timeouts set too short ← Check DevSettings.Timeouts
+
+### Investigate Installation Errors
+
+```bash
+# Search for error messages
+aws logs filter-log-events \
+  --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
+  --region ${REGION} \
+  --filter-pattern "\"Error\" OR \"Failed\" OR \"❌\" OR \"fatal\"" \
+  --max-items 50
+
+# Search for warning messages
+aws logs filter-log-events \
+  --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
+  --region ${REGION} \
+  --filter-pattern "\"Warning\" OR \"⚠️\"" \
+  --max-items 50
+```
+
+### Troubleshoot Failed Component Installation
+
+```bash
+# Can manually reinstall on the HeadNode
+ssh headnode
+
+# Connect to a specific ComputeNode
+srun --nodes=1 --nodelist=compute-node-1 bash
+
+# Manual installation (e.g., Docker)
+sudo apt-get update
+sudo apt-get install -y docker.io
+sudo systemctl start docker
+```
+
+## 📈 Verify Successful Installation
+
+### Check All Components
+
+```bash
+# Run on the HeadNode
+srun --nodes=ALL bash /fsx/scripts/check-compute-setup.sh
+```
+
+**Expected Output**:
+```
+========================================
+ComputeNode Setup Status
+========================================
+Hostname: compute-node-1
+Date: Wed Nov 20 07:30:00 UTC 2025
+========================================
+
+=== System Information ===
+OS:                           ✓ Installed
+  PRETTY_NAME="Ubuntu 22.04.3 LTS"
+Kernel:                       ✓ Installed
+  6.8.0-1039-aws
+
+=== GPU & Drivers ===
+NVIDIA Driver:                ✓ Installed
+  570.172.08
+CUDA:                         ✓ Installed
+  release 12.3
+GPU Count:                    ✓ Installed
+  8
+
+=== EFA ===
+EFA Installer:                ✓ Installed
+Libfabric:                    ✓ Installed
+EFA Devices:                  ✓ Installed
+
+=== Container Runtime ===
+Docker:                       ✓ Installed
+  Docker version 24.0.5
+NVIDIA Container Toolkit:     ✓ Installed
+
+=== Monitoring ===
+DCGM Exporter:                ✓ Running
+Node Exporter:                ✓ Running
+
+=== NCCL ===
+NCCL Profile Script:          ✓ Installed
+NCCL Version:                 ✓ Installed
+  v2.28.7-1
+
+========================================
+Setup Summary
+========================================
+
+Installation Progress: 9/9 components (100%)
+
+✓ All components installed successfully!
+```
+
+### Test Individual Components
+
+```bash
+# Test GPU
+srun --nodes=1 --gpus=1 nvidia-smi
+
+# Test Docker
+srun --nodes=1 docker run --rm hello-world
+
+# Test NCCL
+srun --nodes=2 --ntasks=16 --gpus-per-task=1 \
+  /opt/nccl-tests/build/all_reduce_perf -b 8 -e 128M -f 2 -g 1
+
+# Test EFA
+srun --nodes=2 --ntasks=2 \
+  /opt/amazon/efa/bin/fi_pingpong -p efa
+```
+
+## 🎯 Quick Checklist
+
+After cluster creation, check the following in order:
+
+1. ✅ **CloudFormation Stack Status**
+   ```bash
+   aws cloudformation describe-stacks --stack-name ${CLUSTER_NAME} --region ${REGION} --query 'Stacks[0].StackStatus'
+   ```
+   → `CREATE_COMPLETE` or `CREATE_IN_PROGRESS`
+
+2. ✅ **ComputeNode Instance Status**
+   ```bash
+   aws ec2 describe-instances --filters "Name=tag:Name,Values=Compute" --query 'Reservations[*].Instances[*].State.Name'
+   ```
+   → `running` (if "shutting-down", a timeout has occurred)
+
+3. ✅ **Check CloudWatch Logs**
+   ```bash
+   aws logs tail /aws/parallelcluster/${CLUSTER_NAME} --region ${REGION} --since 10m
+   ```
+   → Verify installation progress messages
+
+4. ✅ **Check Slurm on the HeadNode**
+   ```bash
+   ssh headnode
+   sinfo -N -l
+   ```
+   → Verify ComputeNode status
+
+5. ✅ **Verify Installation Status**
+   ```bash
+   srun --nodes=1 bash /fsx/scripts/check-compute-setup.sh
+   ```
+   → Confirm 100% completion
+
+## 📚 Related Documentation
+
+- [TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md) - Timeout Configuration
+- [config/headnode/README.md](config/headnode/README.md) - NCCL Installation
+- [config/compute/setup-compute-node.sh](config/compute/setup-compute-node.sh) - Installation Script
+- [TROUBLESHOOTING.md](guide/TROUBLESHOOTING.md) - Troubleshooting
+
+## 💡 Tips
+
+1. **Real-time Monitoring**: Start log monitoring as soon as the cluster creation begins
+2. **Generous Timeouts**: Set DevSettings.Timeouts generously (recommend 40 minutes)
+3. **Ignore Errors**: Failures in some optional components (e.g., Pyxis) are normal
+4. **Automatic Retries**: ParallelCluster will automatically restart failed nodes
+5. **Manual Verification**: If in doubt, directly check on the HeadNode
