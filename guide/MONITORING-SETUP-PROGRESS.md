@@ -1,68 +1,68 @@
-# ComputeNode 설치 진행 상황 모니터링 가이드
+# Guide to Monitor ComputeNode Installation Progress
 
-## 개요
+## Overview
 
-ComputeNode 설치는 15-20분 소요되며, 다음 컴포넌트들이 순차적으로 설치됩니다:
-1. EFA Driver (5-10분)
-2. Docker + NVIDIA Container Toolkit (3분)
-3. Pyxis (2분)
-4. CloudWatch Agent (1분)
-5. DCGM Exporter (1분)
-6. Node Exporter (1분)
-7. NCCL 설정 (5초, 있는 경우)
+ComputeNode installation takes about 15-20 minutes, and the following components are installed sequentially:
+1. EFA Driver (5-10 minutes)
+2. Docker + NVIDIA Container Toolkit (3 minutes)
+3. Pyxis (2 minutes)
+4. CloudWatch Agent (1 minute)
+5. DCGM Exporter (1 minute)
+6. Node Exporter (1 minute)
+7. NCCL Configuration (5 seconds, if applicable)
 
-## 🔍 모니터링 방법
+## 🔍 Monitoring Methods
 
-### 방법 1: 자동 모니터링 스크립트 (권장)
+### Method 1: Automatic Monitoring Script (Recommended)
 
 ```bash
-# 클러스터 생성 중 또는 생성 후 실행
+# Run during or after cluster creation
 bash scripts/monitor-compute-node-setup.sh p5en-48xlarge-cluster us-east-2
 ```
 
-**출력 내용**:
-- CloudFormation 스택 상태
-- EC2 인스턴스 상태
-- CloudWatch 로그에서 설치 진행 상황
-- HeadNode 접근 방법
+**Output**:
+- CloudFormation stack status
+- EC2 instance status
+- Installation progress from CloudWatch logs
+- Instructions to access the HeadNode
 
-### 방법 2: CloudWatch Logs 실시간 모니터링
+### Method 2: Real-time CloudWatch Logs Monitoring
 
 ```bash
-# 실시간 로그 스트리밍
+# Stream real-time logs
 aws logs tail /aws/parallelcluster/p5en-48xlarge-cluster \
   --region us-east-2 \
   --follow \
   --filter-pattern "Compute"
 
-# 설치 단계만 필터링
+# Filter only installation steps
 aws logs tail /aws/parallelcluster/p5en-48xlarge-cluster \
   --region us-east-2 \
   --follow \
   --filter-pattern "\"Installing\" OR \"✓\" OR \"Complete\""
 ```
 
-### 방법 3: 특정 컴포넌트 설치 확인
+### Method 3: Verify Specific Component Installation
 
 ```bash
 CLUSTER_NAME="p5en-48xlarge-cluster"
 REGION="us-east-2"
 
-# EFA 설치 확인
+# Verify EFA installation
 aws logs filter-log-events \
   --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
   --region ${REGION} \
   --filter-pattern "\"Installing EFA\" OR \"EFA installation complete\"" \
   --max-items 10
 
-# Docker 설치 확인
+# Verify Docker installation
 aws logs filter-log-events \
   --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
   --region ${REGION} \
   --filter-pattern "\"Installing Docker\" OR \"Docker installation complete\"" \
   --max-items 10
 
-# NCCL 설정 확인
+# Verify NCCL configuration
 aws logs filter-log-events \
   --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
   --region ${REGION} \
@@ -70,10 +70,10 @@ aws logs filter-log-events \
   --max-items 10
 ```
 
-### 방법 4: EC2 인스턴스 상태 확인
+### Method 4: Check EC2 Instance Status
 
 ```bash
-# ComputeNode 인스턴스 목록
+# List ComputeNode instances
 aws ec2 describe-instances \
   --filters "Name=tag:aws:cloudformation:stack-name,Values=${CLUSTER_NAME}" \
             "Name=tag:Name,Values=Compute" \
@@ -81,29 +81,29 @@ aws ec2 describe-instances \
   --query 'Reservations[*].Instances[*].{ID:InstanceId,State:State.Name,IP:PrivateIpAddress,LaunchTime:LaunchTime}' \
   --output table
 
-# 인스턴스가 shutting-down이면 타임아웃 발생
-# running 상태가 유지되면 정상 진행 중
+# If instances are in the "shutting-down" state, a timeout has occurred
+# If instances remain in the "running" state, the installation is in progress
 ```
 
-### 방법 5: HeadNode에서 직접 확인
+### Method 5: Check Directly on the HeadNode
 
 ```bash
-# HeadNode SSH 접속
+# SSH to the HeadNode
 ssh headnode
 
-# Slurm 노드 상태 확인
+# Check Slurm node status
 sinfo -N -l
 
-# ComputeNode에서 설치 상태 확인 스크립트 실행
+# Run the installation status check script on a ComputeNode
 srun --nodes=1 bash /fsx/scripts/check-compute-setup.sh
 
-# 모든 ComputeNode 확인
+# Check all ComputeNodes
 srun --nodes=ALL bash /fsx/scripts/check-compute-setup.sh
 ```
 
-## 📊 설치 진행 단계별 로그 메시지
+## 📊 Log Messages by Installation Phase
 
-### 1. 초기화 단계
+### 1. Initialization Phase
 ```
 === Compute Node Setup Started ===
 Cluster Name: p5en-48xlarge-cluster
@@ -112,34 +112,34 @@ Checking FSx Lustre mount...
 ✓ FSx Lustre mounted at /fsx
 ```
 
-### 2. 병렬 설치 단계
+### 2. Parallel Installation Phase
 ```
 Installing EFA...
 Installing Docker + NVIDIA Container Toolkit...
 Installing CloudWatch Agent...
 ```
 
-### 3. EFA 설치 (가장 오래 걸림)
+### 3. EFA Installation (Takes the longest)
 ```
 GPU detected - installing with GPU support
 Installed EFA packages:
 ✓ EFA installation complete
 ```
 
-### 4. Docker 설치
+### 4. Docker Installation
 ```
 ✓ Docker + NVIDIA Container Toolkit installation complete
 ```
 
-### 5. Pyxis 설치
+### 5. Pyxis Installation
 ```
 Installing Pyxis (Slurm container plugin)...
 ✓ Pyxis installation complete
-(또는)
+(or)
 ⚠️  Pyxis build failed (non-critical)
 ```
 
-### 6. 모니터링 설정
+### 6. Monitoring Configuration
 ```
 Configuring DCGM Exporter...
 ✓ DCGM Exporter configured (port 9400)
@@ -147,16 +147,16 @@ Installing Node Exporter...
 ✓ Node Exporter configured (port 9100)
 ```
 
-### 7. NCCL 설정 (있는 경우)
+### 7. NCCL Configuration (if applicable)
 ```
 Checking for shared NCCL installation...
 Found shared NCCL, configuring environment...
 ✓ Shared NCCL configured
-(또는)
+(or)
 ⚠️  Shared NCCL not found in /fsx/nccl/
 ```
 
-### 8. 완료
+### 8. Completion
 ```
 ✓ Compute Node Setup Complete
 Installed components:
@@ -168,18 +168,18 @@ Installed components:
   - Node Exporter (port 9100) - System metrics
 ```
 
-## 🚨 문제 발생 시 확인 사항
+## 🚨 Troubleshooting
 
-### 타임아웃 발생 (노드가 shutting-down)
+### Timeout Occurred (Nodes are "shutting-down")
 
 ```bash
-# CloudFormation 이벤트 확인
+# Check CloudFormation events
 aws cloudformation describe-stack-events \
   --stack-name ${CLUSTER_NAME} \
   --region ${REGION} \
   --query 'StackEvents[?contains(ResourceStatusReason, `timeout`) || contains(ResourceStatusReason, `Timeout`)]'
 
-# 마지막 로그 확인 (어디서 멈췄는지)
+# Check the last log entries (where it got stuck)
 aws logs get-log-events \
   --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
   --log-stream-name "ip-10-1-XX-XX.i-XXXXX.cloud-init-output" \
@@ -190,23 +190,23 @@ aws logs get-log-events \
   --output text
 ```
 
-**일반적인 타임아웃 원인**:
-1. EFA 설치 실패 (네트워크 문제)
-2. Docker 설치 실패
-3. Pyxis 빌드 실패 (Slurm 헤더 없음) ← 이미 수정됨
-4. 타임아웃 설정이 너무 짧음 ← DevSettings.Timeouts 확인
+**Common Timeout Causes**:
+1. EFA installation failure (network issue)
+2. Docker installation failure
+3. Pyxis build failure (missing Slurm headers) ← Already fixed
+4. Timeouts set too short ← Check DevSettings.Timeouts
 
-### 설치 에러 확인
+### Investigate Installation Errors
 
 ```bash
-# 에러 메시지 검색
+# Search for error messages
 aws logs filter-log-events \
   --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
   --region ${REGION} \
   --filter-pattern "\"Error\" OR \"Failed\" OR \"❌\" OR \"fatal\"" \
   --max-items 50
 
-# 경고 메시지 검색
+# Search for warning messages
 aws logs filter-log-events \
   --log-group-name "/aws/parallelcluster/${CLUSTER_NAME}" \
   --region ${REGION} \
@@ -214,31 +214,31 @@ aws logs filter-log-events \
   --max-items 50
 ```
 
-### 특정 컴포넌트 설치 실패
+### Troubleshoot Failed Component Installation
 
 ```bash
-# HeadNode에서 수동으로 재설치 가능
+# Can manually reinstall on the HeadNode
 ssh headnode
 
-# 특정 ComputeNode에 접속
+# Connect to a specific ComputeNode
 srun --nodes=1 --nodelist=compute-node-1 bash
 
-# 수동 설치 (예: Docker)
+# Manual installation (e.g., Docker)
 sudo apt-get update
 sudo apt-get install -y docker.io
 sudo systemctl start docker
 ```
 
-## 📈 설치 완료 확인
+## 📈 Verify Successful Installation
 
-### 모든 컴포넌트 확인
+### Check All Components
 
 ```bash
-# HeadNode에서 실행
+# Run on the HeadNode
 srun --nodes=ALL bash /fsx/scripts/check-compute-setup.sh
 ```
 
-**예상 출력**:
+**Expected Output**:
 ```
 ========================================
 ComputeNode Setup Status
@@ -289,70 +289,70 @@ Installation Progress: 9/9 components (100%)
 ✓ All components installed successfully!
 ```
 
-### 개별 컴포넌트 테스트
+### Test Individual Components
 
 ```bash
-# GPU 테스트
+# Test GPU
 srun --nodes=1 --gpus=1 nvidia-smi
 
-# Docker 테스트
+# Test Docker
 srun --nodes=1 docker run --rm hello-world
 
-# NCCL 테스트
+# Test NCCL
 srun --nodes=2 --ntasks=16 --gpus-per-task=1 \
   /opt/nccl-tests/build/all_reduce_perf -b 8 -e 128M -f 2 -g 1
 
-# EFA 테스트
+# Test EFA
 srun --nodes=2 --ntasks=2 \
   /opt/amazon/efa/bin/fi_pingpong -p efa
 ```
 
-## 🎯 빠른 체크리스트
+## 🎯 Quick Checklist
 
-클러스터 생성 후 다음 순서로 확인:
+After cluster creation, check the following in order:
 
-1. ✅ **CloudFormation 스택 상태**
+1. ✅ **CloudFormation Stack Status**
    ```bash
    aws cloudformation describe-stacks --stack-name ${CLUSTER_NAME} --region ${REGION} --query 'Stacks[0].StackStatus'
    ```
-   → `CREATE_COMPLETE` 또는 `CREATE_IN_PROGRESS`
+   → `CREATE_COMPLETE` or `CREATE_IN_PROGRESS`
 
-2. ✅ **ComputeNode 인스턴스 상태**
+2. ✅ **ComputeNode Instance Status**
    ```bash
    aws ec2 describe-instances --filters "Name=tag:Name,Values=Compute" --query 'Reservations[*].Instances[*].State.Name'
    ```
-   → `running` (shutting-down이면 타임아웃)
+   → `running` (if "shutting-down", a timeout has occurred)
 
-3. ✅ **CloudWatch 로그 확인**
+3. ✅ **Check CloudWatch Logs**
    ```bash
    aws logs tail /aws/parallelcluster/${CLUSTER_NAME} --region ${REGION} --since 10m
    ```
-   → 설치 진행 메시지 확인
+   → Verify installation progress messages
 
-4. ✅ **HeadNode에서 Slurm 확인**
+4. ✅ **Check Slurm on the HeadNode**
    ```bash
    ssh headnode
    sinfo -N -l
    ```
-   → ComputeNode 상태 확인
+   → Verify ComputeNode status
 
-5. ✅ **설치 상태 확인**
+5. ✅ **Verify Installation Status**
    ```bash
    srun --nodes=1 bash /fsx/scripts/check-compute-setup.sh
    ```
-   → 100% 완료 확인
+   → Confirm 100% completion
 
-## 📚 관련 문서
+## 📚 Related Documentation
 
-- [TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md) - 타임아웃 설정
-- [config/headnode/README.md](config/headnode/README.md) - NCCL 설치
-- [config/compute/setup-compute-node.sh](config/compute/setup-compute-node.sh) - 설치 스크립트
-- [TROUBLESHOOTING.md](guide/TROUBLESHOOTING.md) - 문제 해결
+- [TIMEOUT-CONFIGURATION.md](TIMEOUT-CONFIGURATION.md) - Timeout Configuration
+- [config/headnode/README.md](config/headnode/README.md) - NCCL Installation
+- [config/compute/setup-compute-node.sh](config/compute/setup-compute-node.sh) - Installation Script
+- [TROUBLESHOOTING.md](guide/TROUBLESHOOTING.md) - Troubleshooting
 
-## 💡 팁
+## 💡 Tips
 
-1. **실시간 모니터링**: 클러스터 생성 시작과 동시에 로그 모니터링 시작
-2. **타임아웃 여유**: DevSettings.Timeouts를 충분히 설정 (40분 권장)
-3. **에러 무시**: 일부 optional 컴포넌트(Pyxis) 실패는 정상
-4. **자동 재시도**: ParallelCluster가 실패한 노드를 자동으로 재시작
-5. **수동 확인**: 의심스러우면 HeadNode에서 직접 확인
+1. **Real-time Monitoring**: Start log monitoring as soon as the cluster creation begins
+2. **Generous Timeouts**: Set DevSettings.Timeouts generously (recommend 40 minutes)
+3. **Ignore Errors**: Failures in some optional components (e.g., Pyxis) are normal
+4. **Automatic Retries**: ParallelCluster will automatically restart failed nodes
+5. **Manual Verification**: If in doubt, directly check on the HeadNode
