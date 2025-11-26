@@ -1,6 +1,6 @@
-# ParallelCluster CloudWatch 모니터링
+# ParallelCluster CloudWatch Monitoring
 
-분산학습 클러스터를 위한 종합 모니터링 솔루션입니다.
+A comprehensive monitoring solution for distributed training clusters.
 
 ## 📋 Table of Contents
 
