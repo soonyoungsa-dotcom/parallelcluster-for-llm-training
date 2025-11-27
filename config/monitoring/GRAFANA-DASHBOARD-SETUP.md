@@ -1,43 +1,43 @@
-# Grafana 대시보드 설정 가이드
+# Guide to Grafana Dashboard Setup
 
-## 빠른 시작
+## Quick Start
 
-Grafana Workspace가 생성되었지만 대시보드가 비어있습니다. 다음 방법으로 대시보드를 추가하세요.
+A Grafana Workspace has been created, but the dashboard is empty. Use the following methods to add dashboards.
 
-## 방법 1: 커뮤니티 대시보드 Import (추천 ⭐)
+## Method 1: Import Community Dashboards (Recommended ⭐)
 
-### 1. Node Exporter Full (시스템 메트릭)
+### 1. Node Exporter Full (System Metrics)
 
-**Grafana UI에서:**
+**In the Grafana UI:**
 1. **Dashboards** → **New** → **Import**
-2. Dashboard ID: **`1860`** 입력
-3. **Load** 클릭
-4. Data source: **Amazon Managed Service for Prometheus** 선택
-5. **Import** 클릭
+2. Enter Dashboard ID: **`1860`**
+3. Click **Load**
+4. Select Data source: **Amazon Managed Service for Prometheus**
+5. Click **Import**
 
-**포함된 메트릭:**
-- ✅ CPU 사용률 (전체, 코어별)
-- ✅ Memory 사용률 (Used, Free, Cached)
+**Included Metrics:**
+- ✅ CPU Utilization (Overall, Per-Core)
+- ✅ Memory Utilization (Used, Free, Cached)
 - ✅ Disk I/O (Read/Write)
 - ✅ Network Traffic (In/Out)
 - ✅ System Load (1m, 5m, 15m)
 - ✅ Filesystem Usage
 - ✅ Process Count
 
-**대시보드 링크:** https://grafana.com/grafana/dashboards/1860
+**Dashboard Link:** https://grafana.com/grafana/dashboards/1860
 
 ---
 
-### 2. NVIDIA DCGM Exporter (GPU 메트릭)
+### 2. NVIDIA DCGM Exporter (GPU Metrics)
 
-**Grafana UI에서:**
+**In the Grafana UI:**
 1. **Dashboards** → **New** → **Import**
-2. Dashboard ID: **`12239`** 입력
-3. **Load** 클릭
-4. Data source: **Amazon Managed Service for Prometheus** 선택
-5. **Import** 클릭
+2. Enter Dashboard ID: **`12239`**
+3. Click **Load**
+4. Select Data source: **Amazon Managed Service for Prometheus**
+5. Click **Import**
 
-**포함된 메트릭:**
+**Included Metrics:**
 - ✅ GPU Utilization (%)
 - ✅ GPU Memory Usage (Used/Total)
 - ✅ GPU Temperature (°C)
@@ -47,214 +47,214 @@ Grafana Workspace가 생성되었지만 대시보드가 비어있습니다. 다�
 - ✅ NVLink Throughput
 - ✅ GPU Errors
 
-**대시보드 링크:** https://grafana.com/grafana/dashboards/12239
+**Dashboard Link:** https://grafana.com/grafana/dashboards/12239
 
 ---
 
-### 3. Prometheus Stats (Prometheus 모니터링)
+### 3. Prometheus Stats (Prometheus Monitoring)
 
-**Grafana UI에서:**
+**In the Grafana UI:**
 1. **Dashboards** → **New** → **Import**
-2. Dashboard ID: **`2`** 입력
-3. **Load** 클릭
-4. Data source: **Amazon Managed Service for Prometheus** 선택
-5. **Import** 클릭
+2. Enter Dashboard ID: **`2`**
+3. Click **Load**
+4. Select Data source: **Amazon Managed Service for Prometheus**
+5. Click **Import**
 
-**포함된 메트릭:**
-- ✅ Prometheus 상태
-- ✅ Scrape 성공률
-- ✅ 메트릭 수집 지연
-- ✅ 저장된 샘플 수
+**Included Metrics:**
+- ✅ Prometheus Status
+- ✅ Scrape Success Rate
+- ✅ Metric Collection Latency
+- ✅ Stored Samples
 
-**대시보드 링크:** https://grafana.com/grafana/dashboards/2
+**Dashboard Link:** https://grafana.com/grafana/dashboards/2
 
 ---
 
-## 방법 2: 커스텀 대시보드 Import
+## Method 2: Import Custom Dashboard
 
-이 레포지토리에 포함된 간단한 대시보드를 사용하세요.
+Use the simple dashboard included in this repository.
 
 ### ParallelCluster Overview Dashboard
 
-**파일 위치:** `config/monitoring/parallelcluster-dashboard.json`
+**File Location:** `config/monitoring/parallelcluster-dashboard.json`
 
-**Import 방법:**
+**Import Method:**
 1. **Dashboards** → **New** → **Import**
-2. **Upload JSON file** 클릭
-3. `parallelcluster-dashboard.json` 파일 선택
-4. Data source: **Amazon Managed Service for Prometheus** 선택
-5. **Import** 클릭
+2. Click **Upload JSON file**
+3. Select `parallelcluster-dashboard.json`
+4. Select Data source: **Amazon Managed Service for Prometheus**
+5. Click **Import**
 
-**포함된 패널:**
-- CPU Usage (전체 노드)
-- Memory Usage (전체 노드)
-- GPU Utilization (전체 GPU)
-- GPU Temperature (전체 GPU)
-- Active Compute Nodes (카운트)
-- Total GPUs (카운트)
+**Included Panels:**
+- CPU Usage (All Nodes)
+- Memory Usage (All Nodes)
+- GPU Utilization (All GPUs)
+- GPU Temperature (All GPUs)
+- Active Compute Nodes (Count)
+- Total GPUs (Count)
 
 ---
 
-## 방법 3: 직접 대시보드 만들기
+## Method 3: Build Your Own Dashboard
 
-### 새 대시보드 생성
+### Create a New Dashboard
 
 1. **Dashboards** → **New Dashboard**
-2. **Add visualization** 클릭
-3. Data source: **Amazon Managed Service for Prometheus** 선택
-4. Query 입력 (아래 예시 참고)
-5. **Apply** 클릭
+2. Click **Add visualization**
+3. Select Data source: **Amazon Managed Service for Prometheus**
+4. Enter the query (see example queries below)
+5. Click **Apply**
 
-### 유용한 PromQL 쿼리 예시
+### Useful PromQL Query Examples
 
-#### 시스템 메트릭
+#### System Metrics
 
 ```promql
-# CPU 사용률 (%)
+# CPU Utilization (%)
 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
 
-# Memory 사용률 (%)
+# Memory Utilization (%)
 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
 
-# Disk 사용률 (%)
+# Disk Utilization (%)
 100 - ((node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100)
 
-# Network 수신 (bytes/s)
+# Network Receive (bytes/s)
 rate(node_network_receive_bytes_total{device!="lo"}[5m])
 
-# Network 송신 (bytes/s)
+# Network Transmit (bytes/s)
 rate(node_network_transmit_bytes_total{device!="lo"}[5m])
 
-# System Load (1분 평균)
+# System Load (1 minute average)
 node_load1
 
-# 활성 노드 수
+# Active Nodes Count
 count(up{job="compute-nodes"} == 1)
 ```
 
-#### GPU 메트릭
+#### GPU Metrics
 
 ```promql
-# GPU 사용률 (%)
+# GPU Utilization (%)
 DCGM_FI_DEV_GPU_UTIL
 
-# GPU 메모리 사용률 (%)
+# GPU Memory Utilization (%)
 (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_FREE) * 100
 
-# GPU 온도 (°C)
+# GPU Temperature (°C)
 DCGM_FI_DEV_GPU_TEMP
 
-# GPU 전력 소비 (W)
+# GPU Power Consumption (W)
 DCGM_FI_DEV_POWER_USAGE
 
-# GPU 메모리 사용량 (MB)
+# GPU Memory Used (MB)
 DCGM_FI_DEV_FB_USED
 
-# GPU 클럭 속도 (MHz)
+# GPU Clock Speed (MHz)
 DCGM_FI_DEV_SM_CLOCK
 
-# 총 GPU 수
+# Total GPU Count
 count(DCGM_FI_DEV_GPU_UTIL)
 
-# GPU별 평균 사용률
+# Average GPU Utilization per GPU
 avg by (gpu, instance) (DCGM_FI_DEV_GPU_UTIL)
 ```
 
-#### Prometheus 메트릭
+#### Prometheus Metrics
 
 ```promql
-# Scrape 성공률
+# Scrape Success Rate
 rate(prometheus_target_scrapes_sample_out_of_order_total[5m])
 
-# 수집된 샘플 수
+# Collected Samples
 rate(prometheus_tsdb_head_samples_appended_total[5m])
 
-# 활성 타겟 수
+# Active Targets
 count(up == 1)
 
-# 실패한 타겟 수
+# Failed Targets
 count(up == 0)
 ```
 
 ---
 
-## 데이터가 보이지 않을 때
+## Troubleshooting When Data is Missing
 
-### 1. 클러스터가 생성되었는지 확인
+### 1. Verify Cluster is Created
 
 ```bash
 pcluster describe-cluster --cluster-name YOUR_CLUSTER_NAME
 ```
 
-**Status가 `CREATE_COMPLETE`여야 합니다.**
+**The Status should be `CREATE_COMPLETE`.**
 
-### 2. HeadNode에서 Prometheus 상태 확인
+### 2. Check Prometheus Status on the HeadNode
 
 ```bash
-# HeadNode SSH 접속
+# SSH to the HeadNode
 pcluster ssh --cluster-name YOUR_CLUSTER_NAME -i ~/.ssh/key.pem
 
-# Prometheus 상태 확인
+# Check Prometheus status
 sudo systemctl status prometheus
 
-# Prometheus 로그 확인
+# Check Prometheus logs
 sudo journalctl -u prometheus -n 50
 
-# remote_write 설정 확인
+# Verify remote_write configuration
 grep -A 10 "remote_write" /etc/prometheus/prometheus.yml
 ```
 
-### 3. ComputeNode가 실행 중인지 확인
+### 3. Verify ComputeNodes are Running
 
 ```bash
-# Slurm 노드 상태 확인
+# Check Slurm node status
 sinfo
 
-# 예상 출력:
+# Expected output:
 # PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 # gpu          up   infinite      2   idle compute-dy-gpu-[1-2]
 ```
 
-### 4. Grafana Explore에서 직접 쿼리
+### 4. Query Directly in Grafana Explore
 
-**Grafana UI에서:**
-1. **Explore (🔍)** 메뉴 클릭
-2. Data source: **Amazon Managed Service for Prometheus** 선택
-3. Query 입력: `up`
-4. **Run query** 클릭
+**In the Grafana UI:**
+1. Click **Explore (🔍)** menu
+2. Select Data source: **Amazon Managed Service for Prometheus**
+3. Enter Query: `up`
+4. Click **Run query**
 
-**예상 결과:**
+**Expected Result:**
 ```
-up{instance="10.0.1.100:9100", job="compute-nodes"} 1
-up{instance="10.0.1.101:9100", job="compute-nodes"} 1
-up{instance="10.0.1.100:9400", job="dcgm"} 1
-up{instance="10.0.1.101:9400", job="dcgm"} 1
+up{instance=**********0:9100", job="compute-nodes"} 1
+up{instance=**********1:9100", job="compute-nodes"} 1
+up{instance=**********0:9400", job="dcgm"} 1
+up{instance=**********1:9400", job="dcgm"} 1
 ```
 
-**`up` 값이 1이면 정상, 0이면 문제 있음**
+**If `up` value is 1, it's normal; if 0, there's an issue.**
 
 ---
 
-## 알림 설정 (선택사항)
+## Alert Setup (Optional)
 
-### SNS Topic 생성
+### Create an SNS Topic
 
 ```bash
-# SNS Topic 생성
+# Create SNS Topic
 aws sns create-topic --name pcluster-alerts --region YOUR_REGION
 
-# 이메일 구독
+# Subscribe by email
 aws sns subscribe \
   --topic-arn arn:aws:sns:YOUR_REGION:YOUR_ACCOUNT:pcluster-alerts \
   --protocol email \
   --notification-endpoint your-email@example.com
 
-# 이메일 확인 (받은 메일에서 "Confirm subscription" 클릭)
+# Check email (click "Confirm subscription" in the received email)
 ```
 
-### Grafana 알림 채널 설정
+### Set up Grafana Alert Channel
 
-**Grafana UI에서:**
+**In the Grafana UI:**
 1. **Alerting** → **Notification channels** → **New channel**
 2. **Name**: `SNS Alerts`
 3. **Type**: `AWS SNS`
@@ -262,65 +262,65 @@ aws sns subscribe \
 5. **Auth Provider**: `AWS SDK Default`
 6. **Save**
 
-### 알림 규칙 예시
+### Example Alert Rules
 
-**GPU 온도 알림:**
+**GPU Temperature Alert:**
 ```promql
 DCGM_FI_DEV_GPU_TEMP > 85
 ```
 
-**노드 다운 알림:**
+**Node Down Alert:**
 ```promql
 up{job="compute-nodes"} == 0
 ```
 
-**높은 메모리 사용률 알림:**
+**High Memory Utilization Alert:**
 ```promql
 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 90
 ```
 
-**GPU 메모리 부족 알림:**
+**GPU Memory Pressure Alert:**
 ```promql
 (DCGM_FI_DEV_FB_USED / DCGM_FI_DEV_FB_FREE) * 100 > 95
 ```
 
 ---
 
-## 추가 리소스
+## Additional Resources
 
-### 커뮤니티 대시보드 검색
+### Search for Community Dashboards
 
 - **Grafana Dashboards**: https://grafana.com/grafana/dashboards/
-- **검색 키워드**: `node exporter`, `nvidia`, `dcgm`, `gpu`, `prometheus`
+- **Search Keywords**: `node exporter`, `nvidia`, `dcgm`, `gpu`, `prometheus`
 
-### 추천 대시보드
+### Recommended Dashboards
 
-| Dashboard | ID | 설명 |
-|-----------|-----|------|
-| Node Exporter Full | 1860 | 완전한 시스템 메트릭 |
-| NVIDIA DCGM Exporter | 12239 | GPU 메트릭 |
-| Prometheus Stats | 2 | Prometheus 자체 모니터링 |
-| Node Exporter for Prometheus | 11074 | 간단한 시스템 메트릭 |
-| NVIDIA GPU Metrics | 14574 | 대체 GPU 대시보드 |
+| Dashboard | ID | Description |
+|-----------|-----|------------|
+| Node Exporter Full | 1860 | Comprehensive system metrics |
+| NVIDIA DCGM Exporter | 12239 | GPU metrics |
+| Prometheus Stats | 2 | Prometheus self-monitoring |
+| Node Exporter for Prometheus | 11074 | Simple system metrics |
+| NVIDIA GPU Metrics | 14574 | Alternative GPU dashboard |
 
-### 문서
+### Documentation
 
-- [Grafana 문서](https://grafana.com/docs/grafana/latest/)
-- [PromQL 가이드](https://prometheus.io/docs/prometheus/latest/querying/basics/)
-- [DCGM Exporter 메트릭](https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-field-ids.html)
-- [Node Exporter 메트릭](https://github.com/prometheus/node_exporter#enabled-by-default)
+- [Grafana Documentation](https://grafana.com/docs/grafana/latest/)
+- [PromQL Guide](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+- [DCGM Exporter Metrics](https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-field-ids.html)
+- [Node Exporter Metrics](https://github.com/prometheus/node_exporter#enabled-by-default)
 
 ---
 
-## 요약
+## Summary
 
-**빠른 시작 (3분):**
-1. Grafana 접속
-2. Dashboard ID `1860` Import (시스템 메트릭)
-3. Dashboard ID `12239` Import (GPU 메트릭)
-4. 완료! 🎉
+**Quick Start (3 minutes):**
+1. Access Grafana
+2. Import Dashboard ID `1860` (System Metrics)
+3. Import Dashboard ID `12239` (GPU Metrics)
+4. You're done! 🎉
 
-**데이터가 없다면:**
-- 클러스터가 생성되었는지 확인
-- HeadNode + ComputeNode가 실행 중인지 확인
-- 5-10분 정도 기다리면 데이터 수집 시작
+**If no data is visible:**
+- Verify the cluster is created
+- Ensure HeadNode and ComputeNodes are running
+- Wait 5-10 minutes for data collection to start
