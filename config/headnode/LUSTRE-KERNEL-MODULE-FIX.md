@@ -1,57 +1,57 @@
-# Lustre Kernel Module Version Mismatch 해결 가이드
+# Guide to Resolve Lustre Kernel Module Version Mismatch
 
-## 문제 원인
+## Root Cause
 
-### 근본 원인
-1. **Ubuntu 자동 보안 업데이트**
-   - `unattended-upgrades` 패키지가 백그라운드에서 커널 자동 업데이트
-   - 클러스터 생성 후 몇 시간~며칠 내에 발생 가능
+### Underlying Cause
+1. **Ubuntu Automatic Security Updates**
+   - `unattended-upgrades` package automatically updates the kernel in the background
+   - Can occur a few hours to days after cluster creation
 
-2. **Lustre 모듈의 커널 의존성**
-   - Lustre 클라이언트 모듈은 정확한 커널 버전에 매칭되어야 함
-   - 커널 `6.8.0-1039`용 모듈은 `6.8.0-1042`에서 작동 안 함
+2. **Lustre Module Kernel Dependence**
+   - Lustre client modules must match the exact kernel version
+   - Modules for kernel `6.8.0-1039` won't work with `6.8.0-1042`
 
-3. **발생 시나리오**
+3. **Failure Scenario**
    ```
-   클러스터 생성 (커널 6.8.0-1039)
-   → Lustre 모듈 6.8.0-1039 설치
-   → 자동 업데이트로 커널 6.8.0-1042 설치
-   → 재부팅
-   → 커널 6.8.0-1042로 부팅
-   → Lustre 모듈 6.8.0-1039는 호환 안 됨
-   → /fsx 마운트 실패
+   Cluster creation (kernel 6.8.0-1039)
+   → Install Lustre modules for 6.8.0-1039
+   → Automatic update installs kernel 6.8.0-1042
+   → Reboot
+   → Boot into kernel 6.8.0-1042
+   → Lustre modules 6.8.0-1039 are incompatible
+   → /fsx mount fails
    ```
 
-## 해결 방법
+## Resolution Methods
 
-### 방법 1: 즉시 수동 수정 (긴급)
+### Method 1: Immediate Manual Fix (Urgent)
 
 ```bash
-# 헤드노드에서 실행
+# Run on the HeadNode
 sudo su
 
-# 현재 커널 확인
+# Check current kernel
 uname -r
 
-# 매칭되는 Lustre 모듈 설치
+# Install matching Lustre modules
 apt-get update
 apt-get install -y lustre-client-modules-$(uname -r)
 
-# Lustre 모듈 로드
+# Load Lustre modules
 modprobe lustre
 
-# /fsx 마운트
+# Mount /fsx
 systemctl restart fsx.mount
 
-# 확인
+# Verify
 df -h | grep fsx
 ```
 
-### 방법 2: 자동 수정 스크립트 (권장)
+### Method 2: Automatic Fix Script (Recommended)
 
-#### A. setup-headnode.sh에 통합
+#### A. Integrate into setup-headnode.sh
 
-`setup-headnode.sh` 시작 부분에 추가:
+Add the following at the beginning of `setup-headnode.sh`:
 
 ```bash
 #!/bin/bash
@@ -78,22 +78,22 @@ fi
 echo "✓ Lustre ready"
 ```
 
-#### B. 독립 스크립트 사용
+#### B. Use a Standalone Script
 
 ```bash
-# S3에서 다운로드
+# Download from S3
 aws s3 cp s3://pcluster-setup-269550163595/config/headnode/fix-lustre-module.sh /tmp/
 sudo bash /tmp/fix-lustre-module.sh
 ```
 
-#### C. CustomActions에 추가
+#### C. Add to CustomActions
 
-`cluster-config.yaml.template`에 추가:
+Add the following to `cluster-config.yaml.template`:
 
 ```yaml
 HeadNode:
   CustomActions:
-    OnNodeStart:  # 부팅 시마다 실행
+    OnNodeStart:  # Run on every boot
       Sequence:
         - Script: 's3://pcluster-setup-269550163595/config/headnode/fix-lustre-module.sh'
     OnNodeConfigured:
@@ -101,14 +101,14 @@ HeadNode:
         - Script: 's3://pcluster-setup-269550163595/config/headnode/setup-headnode.sh'
 ```
 
-### 방법 3: 커널 자동 업데이트 방지 (예방)
+### Method 3: Prevent Kernel Auto-Updates (Preventive)
 
-#### A. 클러스터 생성 시 적용
+#### A. Apply During Cluster Creation
 
-`environment-variables-bailey.sh`에 추가:
+Add the following to `environment-variables-bailey.sh`:
 
 ```bash
-# HeadNode CustomActions에 커널 업데이트 방지 스크립트 추가
+# Add kernel update prevention script to HeadNode CustomActions
 HEADNODE_CUSTOM_ACTIONS="
 - Script: 's3://${S3_BUCKET}/config/headnode/disable-kernel-auto-update.sh'
 - Script: 's3://${S3_BUCKET}/config/headnode/setup-headnode.sh'
@@ -118,23 +118,23 @@ HEADNODE_CUSTOM_ACTIONS="
 "
 ```
 
-#### B. 기존 클러스터에 적용
+#### B. Apply to Existing Cluster
 
 ```bash
-# 헤드노드에서 실행
+# Run on the HeadNode
 sudo bash /fsx/config/headnode/disable-kernel-auto-update.sh
 ```
 
-이 스크립트는:
-- ✅ 커널 패키지를 자동 업데이트 블랙리스트에 추가
-- ✅ 현재 커널 버전을 hold
-- ✅ Lustre 모듈을 현재 커널에 고정
-- ✅ 부팅 시 Lustre 모듈 체크 서비스 생성
+This script:
+- ✅ Adds kernel packages to the auto-update blacklist
+- ✅ Holds the current kernel version
+- ✅ Fixes Lustre modules to the current kernel
+- ✅ Creates a boot-time Lustre module check service
 
-### 방법 4: Systemd 서비스로 자동화 (최고 안정성)
+### Method 4: Systemd Service for Automation (Highest Stability)
 
 ```bash
-# /etc/systemd/system/lustre-module-check.service 생성
+# Create /etc/systemd/system/lustre-module-check.service
 cat > /etc/systemd/system/lustre-module-check.service << 'EOF'
 [Unit]
 Description=Check and fix Lustre kernel module on boot
@@ -150,141 +150,141 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 
-# 스크립트 복사
+# Copy the script
 sudo cp /fsx/config/headnode/fix-lustre-module.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/fix-lustre-module.sh
 
-# 서비스 활성화
+# Enable the service
 sudo systemctl daemon-reload
 sudo systemctl enable lustre-module-check.service
 ```
 
-## 권장 워크플로우
+## Recommended Workflows
 
-### 신규 클러스터 생성 시
+### New Cluster Creation
 
-1. **예방 조치 (권장)**
+1. **Preventive Measures (Recommended)**
    ```bash
-   # environment-variables-bailey.sh 수정
-   # HeadNode CustomActions에 disable-kernel-auto-update.sh 추가
+   # Modify environment-variables-bailey.sh
+   # Add disable-kernel-auto-update.sh to HeadNode CustomActions
    
-   # 클러스터 생성
+   # Create the cluster
    pcluster create-cluster --cluster-name my-cluster \
      --cluster-configuration cluster-config.yaml
    ```
 
-2. **생성 후 확인**
+2. **Post-Creation Verification**
    ```bash
-   # 헤드노드 접속
+   # SSH to the HeadNode
    ssh headnode
    
-   # Lustre 상태 확인
+   # Check Lustre status
    /fsx/scripts/check-lustre.sh
    ```
 
-### 기존 클러스터 수정 시
+### Existing Cluster Update
 
-1. **즉시 수정**
+1. **Immediate Fix**
    ```bash
    sudo bash /fsx/config/headnode/fix-lustre-module.sh
    ```
 
-2. **영구 방지**
+2. **Permanent Prevention**
    ```bash
    sudo bash /fsx/config/headnode/disable-kernel-auto-update.sh
    ```
 
-3. **확인**
+3. **Verification**
    ```bash
    /fsx/scripts/check-lustre.sh
    apt-mark showhold | grep linux
    ```
 
-## 트러블슈팅
+## Troubleshooting
 
-### 증상: /fsx 마운트 실패
+### Symptom: /fsx Mount Failure
 
 ```bash
-# 에러 확인
+# Check the error
 systemctl status fsx.mount
 journalctl -u fsx.mount -n 50
 
-# 일반적인 에러 메시지
+# Common error messages:
 # "mount.lustre: mount fs-xxx at /fsx failed: No such device"
 # "Are the lustre modules loaded?"
 ```
 
-**해결:**
+**Resolution:**
 ```bash
-# 1. 커널 버전 확인
+# 1. Check the kernel version
 uname -r
 
-# 2. 설치된 Lustre 모듈 확인
+# 2. Verify installed Lustre modules
 dpkg -l | grep lustre-client-modules
 
-# 3. 매칭되는 모듈 설치
+# 3. Install the matching module
 sudo apt-get install -y lustre-client-modules-$(uname -r)
 
-# 4. 모듈 로드
+# 4. Load the module
 sudo modprobe lustre
 
-# 5. 마운트 재시도
+# 5. Retry the mount
 sudo systemctl restart fsx.mount
 ```
 
-### 증상: 모듈 설치 실패
+### Symptom: Module Installation Failure
 
 ```bash
-# 에러: "Unable to locate package lustre-client-modules-6.8.0-1042-aws"
+# Error: "Unable to locate package lustre-client-modules-6.8.0-1042-aws"
 ```
 
-**해결:**
+**Resolution:**
 ```bash
-# 1. FSx Lustre 레포지토리 확인
+# 1. Check the FSx Lustre repo
 cat /etc/apt/sources.list.d/fsxlustreclientrepo.list
 
-# 2. 레포지토리 업데이트
+# 2. Update the repo
 sudo apt-get update
 
-# 3. 사용 가능한 모듈 확인
+# 3. Check available modules
 apt-cache search lustre-client-modules | grep $(uname -r | cut -d- -f1-2)
 
-# 4. 레포지토리 재추가 (필요시)
+# 4. Re-add the repo (if needed)
 wget -O - https://fsx-lustre-client-repo-public-keys.s3.amazonaws.com/fsx-ubuntu-public-key.asc | sudo apt-key add -
 sudo bash -c 'echo "deb https://fsx-lustre-client-repo.s3.amazonaws.com/ubuntu jammy main" > /etc/apt/sources.list.d/fsxlustreclientrepo.list'
 sudo apt-get update
 ```
 
-## 파일 위치
+## File Locations
 
-생성된 스크립트들:
+Created scripts:
 
 ```
 /fsx/config/headnode/
-├── fix-lustre-module.sh              # Lustre 모듈 자동 수정
-├── disable-kernel-auto-update.sh     # 커널 자동 업데이트 방지
-└── download-ngc-containers.sh        # Lustre 체크 포함된 컨테이너 다운로드
+├── fix-lustre-module.sh              # Automatic Lustre module fix
+├── disable-kernel-auto-update.sh     # Prevent kernel auto-updates
+└── download-ngc-containers.sh        # Includes Lustre check
 
 /fsx/scripts/
-└── check-lustre.sh                   # Lustre 헬스 체크
+└── check-lustre.sh                   # Lustre health check
 
 /etc/systemd/system/
-└── lustre-module-check.service       # 부팅 시 자동 체크 서비스
+└── lustre-module-check.service       # Automatic boot-time check service
 ```
 
-## 모니터링
+## Monitoring
 
-### 정기 체크
+### Periodic Checks
 
 ```bash
-# Cron으로 매일 체크
-echo "0 2 * * * root /fsx/scripts/check-lustre.sh >> /var/log/lustre-check.log 2>&1" | sudo tee -a /etc/crontab
+# Add a daily Cron check
+echo "0 2 * * * **** /fsx/scripts/check-lustre.sh >> /var/log/lustre-check.log 2>&1" | sudo tee -a /etc/crontab
 ```
 
-### CloudWatch 알람
+### CloudWatch Alarms
 
 ```bash
-# Lustre 마운트 실패 시 알람
+# Alarm on Lustre mount failure
 aws cloudwatch put-metric-alarm \
   --alarm-name lustre-mount-failed \
   --alarm-description "Lustre filesystem not mounted" \
@@ -296,7 +296,7 @@ aws cloudwatch put-metric-alarm \
   --comparison-operator LessThanThreshold
 ```
 
-## 참고 자료
+## References
 
 - [AWS FSx for Lustre Client](https://docs.aws.amazon.com/fsx/latest/LustreGuide/install-lustre-client.html)
 - [Ubuntu Unattended Upgrades](https://help.ubuntu.com/community/AutomaticSecurityUpdates)
